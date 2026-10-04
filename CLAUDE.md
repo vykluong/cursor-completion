@@ -12,17 +12,20 @@ zsh tests/run-tests.zsh 'mcp-*'      # subset, glob on case name
 zsh tests/zcomp-runner.zsh 'agent mcp '   # print candidates for one buffer
 DOUBLE_TAB=1 zsh tests/zcomp-runner.zsh 'agent '   # simulate a second TAB
 zsh -n src/_cursor-agent             # syntax check (CI gate; the suite also runs it as preflight)
+zsh tools/check-drift.zsh            # diff installed CLI against tools/cli-surface.txt (runs `agent`; exit 1 drift, 2 tool or miner failure)
+zsh tools/check-drift.zsh snapshot   # accept the new CLI surface
+zsh tools/check-drift.zsh dump --static   # mined records only; executes nothing
+zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>   # compare two installed versions, statically
+zsh tools/check-drift.zsh --help     # modes, flags (--version-dir, --static, --full), exit codes
 ```
 
 Planned, not yet written:
 
 ```bash
-zsh tools/check-drift.zsh            # diff installed CLI against tools/cli-surface.txt (needs `agent` on PATH)
-zsh tools/check-drift.zsh snapshot   # accept the new CLI surface
 zsh tools/check-coverage.zsh         # compare src/_cursor-agent with the snapshot, both directions (no binary needed)
 ```
 
-The test harness drives a real interactive zsh through zpty. It never invokes the `agent` binary; only `tools/check-drift.zsh` will.
+The test harness drives a real interactive zsh through zpty. It never invokes the `agent` binary; only `tools/check-drift.zsh` does.
 
 ## Scope: the four surface tiers
 
@@ -61,11 +64,13 @@ Only `tools/check-drift.zsh` may run `agent`, and CI never does.
 - Every invocation, even `--help`, does a DNS lookup of `api2.cursor.sh` and may warm Statsig.
 - An unknown first word is a prompt and starts a real session. Never run a line that could parse cleanly (no bare booleans, no positional words).
 - `agent persist attach --help` and `agent persist stop --help` treat `--help` as a session name. Never run them.
-- Run with a throwaway `HOME` and `CURSOR_CONFIG_DIR`, a scrubbed environment (no `CURSOR_*` / `AGENT_CLI_*`), `</dev/null`, and a wall-clock cap.
+- Run each invocation in a fresh throwaway directory (`HOME`, `CURSOR_CONFIG_DIR`, `TMPDIR`, and a cwd outside any git repo) with an environment built from scratch (no `CURSOR_*`; `AGENT_CLI_CREDENTIAL_STORE=memory` keeps it off the login keychain), `</dev/null`, and a wall-clock cap that kills its process group.
+- Only two argv shapes ever run: `<command words> --help` and the option probe `<command words> <flag> --zz-bogus-1 --zz-bogus-2`. One trailing bogus flag is not enough: a required value or a shadowing root option can eat it, and the line then parses cleanly (`worker start --data-dir --zz-bogus` starts a worker). `run_isolated` and `guard_argv` enforce this; never loosen them.
+- The safety analysis covered build 2026.10.01-e373342 only, so `check-drift.zsh diff` is static unless given `--full`, which executes both versions.
 
 ## Updating for a new CLI release
 
-The planned tooling (`check-drift.zsh`, `check-coverage.zsh`) does not exist yet; this is the target runbook.
+`tools/check-coverage.zsh` (step 4) is still planned; the other steps work today. To preview an update before switching, run `zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>`.
 
 1. `agent update`.
 2. `zsh tools/check-drift.zsh`. If it exits 2 ("miner needs attention"), fix the miner first.
