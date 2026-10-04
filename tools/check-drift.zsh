@@ -10,27 +10,43 @@
 # result, never the other way around.
 #
 # Usage:
-#   zsh tools/check-drift.zsh [options] [check]   # default: regenerate + diff, exit 1 on drift
-#   zsh tools/check-drift.zsh [options] snapshot  # overwrite tools/cli-surface.txt
-#   zsh tools/check-drift.zsh [options] dump      # write the dump to stdout, no diff
-#   zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>
+#   zsh tools/check-drift.zsh [options] [check]   # default: dump the CLI, compare with
+#                                                 # tools/cli-surface.txt, exit 1 on drift
+#   zsh tools/check-drift.zsh [options] snapshot  # dump the CLI, overwrite tools/cli-surface.txt
+#   zsh tools/check-drift.zsh [options] dump      # write the dump to stdout, compare nothing
+#   zsh tools/check-drift.zsh [--full] diff <old-version-dir> <new-version-dir>
+#                                                 # compare two installed versions
+#   zsh tools/check-drift.zsh -h | --help
 #
 # Options:
-#   --version-dir <path>  use this version directory instead of the one `agent`
-#                         resolves to (any dir under ~/.local/share/cursor-agent/versions/)
-#   --static              mined half only; never execute the CLI
+#   --version-dir <path>  check, snapshot, dump: use this version directory
+#                         instead of the one `agent` resolves to (any dir under
+#                         ~/.local/share/cursor-agent/versions/). Without
+#                         --static, that version's CLI is executed.
+#   --static              check, dump: mined half only; never execute the CLI.
+#                         `check --static` compares with the snapshot minus its
+#                         help-walk and probe attributes.
+#   --full                diff: dump both versions in full, which EXECUTES both
+#                         CLIs (over 100 runs each). The runner's argv shapes
+#                         were cleared as safe against 2026.10.01-e373342 only;
+#                         another build may act on a probe line (start a
+#                         session or a worker). Default: static, nothing runs,
+#                         and the report is not probe-verified.
 #
 # Environment:
 #   CHECK_DRIFT_CACHE=<dir>  development aid: record every CLI run under
 #                            <dir>/<version>/ and replay it on later runs
 #
-# Exit codes: 0 = no drift, 1 = drift, 2 = the tool itself could not run (no
-# `agent` on PATH, a bad version directory, the miner needs attention, or a
-# CLI run did something unexpected).
+# Exit codes: 0 = no drift (diff: no difference), 1 = drift (in check, a
+# version-only change too: the snapshot and the script's target-version
+# header are then stale), 2 = the tool itself could not run (no `agent` on
+# PATH, a bad version directory or argument, the miner needs attention, or a
+# CLI run did something unexpected). 2 wins: no report is printed after it.
 #
-# STATUS: `dump` (mined records, help walk, probes, mined-vs-help validation)
-# and `dump --static` work. The check / snapshot / diff modes are stubs that
-# exit 2 with "not implemented".
+# The drift report compares records by key (the first three fields), groups
+# added, removed and changed records by command path, and names the
+# completion function for each path. Version meta records are reported apart,
+# so a release with no surface change reads as a version bump only.
 #
 # Where the surface comes from. `agent` is not a native binary: it is a bash
 # wrapper that runs a bundled Node on a webpack bundle, <version-dir>/index.js,
@@ -114,7 +130,7 @@ typeset -g SCRIPT_PATH=${0:A}
 typeset -g SNAPSHOT=${SCRIPT_PATH:h}/cli-surface.txt
 
 typeset -g OPT_VERSION_DIR='' VERSION_DIR='' VERSION=''
-typeset -gi STATIC_ONLY=0
+typeset -gi STATIC_ONLY=0 DIFF_FULL=0
 
 typeset -ga _TMPFILES=() _TMPDIRS=()
 
@@ -1916,23 +1932,178 @@ build_dump() {
     "$nr probe=recognized, $nu probe=unknown, $ns static-only; $RUN_COUNT CLI executions"
 }
 
-not_implemented() {
-  die "not implemented: $1 (only dump exists so far)"
+# --- drift report ------------------------------------------------------------
+
+# The dump's records without what the help walk and the probes appended, so a
+# full snapshot can be compared with a --static dump.
+strip_executed() {
+  local line
+  local -a F
+  for line in "${(@f)$(<$1)}"; do
+    [[ $line == '#'* ]] && continue
+    F=("${(@s: | :)line}")
+    print -r -- "${(j: | :)${(@)F:#(help-listed|probe=*|probe-value=*|unknown-flags=*|static-only=*|walk=*|not-walked=*)}}"
+  done
 }
 
-mode_check()    { not_implemented "check mode" }
-mode_snapshot() { not_implemented "snapshot mode" }
-# diff <old-version-dir> <new-version-dir>: dump both, diff grouped by path.
-mode_diff()     { not_implemented "diff mode" }
+# drift_report <old-dump> <new-dump> <old-label> <new-label> <basis>
+# Prints the report on stdout; returns 0 if the records are identical, else 1.
+# A record's key is its first three fields. A key with exactly one record on
+# each side is "changed" (old and new tier and attributes shown); any other
+# difference is an added or removed record. Meta records go in their own
+# section, so a version bump is never mixed into the surface groups.
+drift_report() {
+  local line key p rest
+  local -a F ol nl gone came keys o n
+  local -A rm ad grp
+  local -i n_add=0 n_rm=0 n_chg=0
+  ol=(${(M)${(f)"$(<$1)"}:#[^#]*})
+  nl=(${(M)${(f)"$(<$2)"}:#[^#]*})
+  gone=("${(@)ol:|nl}") came=("${(@)nl:|ol}")
+  (( $#gone + $#came )) || return 0
+  for line in $gone; do F=("${(@s: | :)line}"); rm[${(j: | :)F[1,3]}]+=$line$'\n'; done
+  for line in $came; do F=("${(@s: | :)line}"); ad[${(j: | :)F[1,3]}]+=$line$'\n'; done
+  local -a metas=()
+  keys=(${(k)rm} ${(k)ad})
+  for key in ${(ou)keys}; do
+    F=("${(@s: | :)key}")
+    p=$F[2]
+    o=(${(f)rm[$key]-}) n=(${(f)ad[$key]-})
+    if (( $#o == 1 && $#n == 1 )); then
+      if [[ $F[1] == meta ]]; then
+        metas+=("$F[3]: ${${(s: | :)o[1]}[5,-1]} -> ${${(s: | :)n[1]}[5,-1]}")
+        continue
+      fi
+      rest="  ~ $key"$'\n'"      was: ${(j: | :)${(@s: | :)o[1]}[4,-1]}"$'\n'"      now: ${(j: | :)${(@s: | :)n[1]}[4,-1]}"
+      (( n_chg++ ))
+    else
+      if [[ $F[1] == meta ]]; then
+        metas+=("${^o[@]/#/- }" "${^n[@]/#/+ }")
+        continue
+      fi
+      rest=''
+      for line in $o; do rest+="  - $line"$'\n'; (( n_rm++ )); done
+      for line in $n; do rest+="  + $line"$'\n'; (( n_add++ )); done
+      rest=${rest%$'\n'}
+      # A command record also names the function for the subcommand itself.
+      if [[ $F[1] == cmd && "$o$n" != *' | builtin'* ]]; then
+        rest+=$'\n'"      subcommand function: $(path_function "$F[2] $F[3]")"
+      fi
+    fi
+    grp[$p]+=$rest$'\n'
+  done
+  print -r -- "drift: $3 -> $4"
+  print -r -- "basis: $5"
+  if (( $#metas )); then
+    print -r -- "version and meta records:"
+    print -rl -- "  "${^metas}
+  else
+    print -r -- "version and meta records: unchanged"
+  fi
+  if (( n_add + n_rm + n_chg == 0 )); then
+    print -r -- "surface: no changes (a version bump only)"
+    return 1
+  fi
+  print -r -- "surface: $n_add added, $n_rm removed, $n_chg changed"
+  for p in ${(ok)grp}; do
+    print -r -- ""
+    print -r -- "$p  ->  $(path_function "$p")"
+    print -rn -- "$grp[$p]"
+  done
+  return 1
+}
 
+# --- modes ---------------------------------------------------------------------
+
+# Full dump against the committed snapshot (--static: the mined half against
+# the snapshot minus its help-walk and probe attributes).
+mode_check() {
+  local now old basis
+  [[ -r $SNAPSHOT ]] || die "no snapshot at $SNAPSHOT; create it with: zsh tools/check-drift.zsh snapshot"
+  locate_version_dir
+  new_tmpfile; now=$REPLY
+  build_dump >|"$now"
+  if (( STATIC_ONLY )); then
+    new_tmpfile; old=$REPLY
+    strip_executed "$SNAPSHOT" >|"$old"
+    basis="static mining only (--static): nothing was executed, and the snapshot's help-walk and probe attributes were set aside"
+  else
+    old=$SNAPSHOT
+    basis="full dump (static mining, help walk, probes) against the committed full snapshot"
+  fi
+  if drift_report "$old" "$now" "${SNAPSHOT:t} (committed)" "$VERSION ($VERSION_DIR)" "$basis"; then
+    print -r -- "check-drift: no drift: $VERSION matches ${SNAPSHOT:t}"
+    return 0
+  fi
+  print -r -- ""
+  print -r -- "check-drift: DRIFT. Edit the functions named above in src/_cursor-agent, regenerate"
+  print -r -- "  their test cases, re-snapshot (zsh tools/check-drift.zsh snapshot) and bump the"
+  print -r -- "  target-version header. Runbook: CLAUDE.md, \"Updating for a new CLI release\"."
+  return 1
+}
+
+# Full dump into a temp file beside the snapshot, then one rename: a failed
+# run (any exit 2) leaves the committed snapshot untouched.
+mode_snapshot() {
+  local tmp
+  local -a recs
+  (( STATIC_ONLY )) && die "snapshot needs the full dump; --static would drop the help-walk and probe attributes"
+  locate_version_dir
+  tmp=$(mktemp "${SNAPSHOT:h}/.cli-surface.XXXXXX") || die "mktemp failed"
+  _TMPFILES+=("$tmp")
+  build_dump >|"$tmp"
+  recs=(${(M)${(f)"$(<$tmp)"}:#[^#]*})
+  [[ ${#${(M)recs:#'meta | agent | version | '*}} -eq 1 ]] ||
+    die "the dump has no version record; ${SNAPSHOT:t} left unchanged"
+  chmod 644 "$tmp"                      # mktemp gives 0600; this file is committed
+  mv -f -- "$tmp" "$SNAPSHOT" || die "cannot replace $SNAPSHOT"
+  _TMPFILES=("${(@)_TMPFILES:#$tmp}")
+  print -r -- "check-drift: wrote $SNAPSHOT ($VERSION, $#recs records)"
+}
+
+# diff <old-version-dir> <new-version-dir>: dump each version in a child
+# process (static unless --full) and report the difference.
+mode_diff() {
+  local dir f basis
+  local -a files labels flags=(--static)
+  local -i rc
+  if (( DIFF_FULL )); then
+    flags=()
+    basis="full dump of each version: both CLIs were executed (help walk, probes)"
+  else
+    basis="static mining of both bundles only: nothing was executed, so no entry is probe-verified"
+  fi
+  for dir in "$@"; do
+    [[ -r $dir/index.js ]] || die "$dir has no index.js; not a Cursor CLI version directory"
+    new_tmpfile; f=$REPLY
+    zsh -f -- "$SCRIPT_PATH" --version-dir "$dir" $flags dump >|"$f"
+    rc=$?
+    (( rc == 0 )) || { (( rc == 2 )) && exit 2; die "dumping $dir failed (exit $rc)" }
+    files+=("$f") labels+=("${dir:A:t}")
+  done
+  if drift_report "$files[1]" "$files[2]" "$labels[1]" "$labels[2]" "$basis"; then
+    print -r -- "check-drift: no difference between $labels[1] and $labels[2]"
+    return 0
+  fi
+  return 1
+}
+
+# The header's usage, options, environment, exit codes and report paragraphs.
 usage() {
-  local line
+  local line on=0
   while IFS= read -r line; do
-    [[ $line == '#!'* ]] && continue
-    [[ $line == '#'* ]] || break
+    [[ $line == '# Usage:' ]] && on=1
+    [[ $line == '# Where the surface comes from.'* ]] && break
+    (( on )) || continue
     line=${line#\#}
     print -r -- "${line# }"
   done <"$SCRIPT_PATH"
+}
+
+usage_error() {
+  print -ru2 -- "check-drift: $*"
+  print -ru2 -- "Run 'zsh tools/check-drift.zsh --help' for usage."
+  exit 2
 }
 
 # ---------------------------------------------------------------------------
@@ -1945,14 +2116,15 @@ main() {
   while (( $# )); do
     case $1 in
       --version-dir)
-        (( $# >= 2 )) || die "--version-dir needs a path"
+        (( $# >= 2 )) || usage_error "--version-dir needs a path"
         OPT_VERSION_DIR=$2
         shift 2
         ;;
       --version-dir=*) OPT_VERSION_DIR=${1#*=}; shift ;;
       --static)        STATIC_ONLY=1; shift ;;
+      --full)          DIFF_FULL=1; shift ;;
       -h|--help|help)  usage; return 0 ;;
-      -*)              die "unknown option '$1'" ;;
+      -*)              usage_error "unknown option '$1'" ;;
       *)
         if [[ -z $mode ]]; then mode=$1; else rest+=("$1"); fi
         shift
@@ -1960,10 +2132,19 @@ main() {
     esac
   done
   mode=${mode:-check}
+  [[ $mode == (check|snapshot|dump|diff) ]] ||
+    usage_error "unknown mode '$mode' (expected: check | snapshot | dump | diff)"
+  if [[ $mode == diff ]]; then
+    [[ -z $OPT_VERSION_DIR ]] || usage_error "diff takes its two version directories as arguments, not --version-dir"
+    (( STATIC_ONLY && DIFF_FULL )) && usage_error "--static and --full contradict each other"
+    (( ${#rest} == 2 )) || usage_error "diff needs <old-version-dir> <new-version-dir>"
+  else
+    (( DIFF_FULL )) && usage_error "--full applies to diff only"
+    (( ${#rest} == 0 )) || usage_error "$mode takes no arguments"
+  fi
 
   case $mode in
     dump)
-      (( ${#rest} == 0 )) || die "dump takes no arguments"
       locate_version_dir
       # Into a file first, so a failure partway prints nothing. A function
       # with a redirection still runs in this shell, so its exits are ours.
@@ -1971,17 +2152,8 @@ main() {
       build_dump >|"$tmp"
       cat -- "$tmp"
       ;;
-    check|snapshot)
-      (( ${#rest} == 0 )) || die "$mode takes no arguments"
-      mode_$mode
-      ;;
-    diff)
-      (( ${#rest} == 2 )) || die "usage: zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>"
-      mode_diff "${rest[@]}"
-      ;;
-    *)
-      die "unknown mode '$mode' (expected: check | snapshot | dump | diff)"
-      ;;
+    check|snapshot) mode_$mode ;;
+    diff)           mode_diff "${rest[@]}" ;;
   esac
 }
 
