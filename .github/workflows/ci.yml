@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# CI never invokes the `agent` binary. Only tools/check-drift.zsh executes the
+# CLI, and it is run by hand, not here.
+
+jobs:
+  syntax:
+    name: syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+      - name: Check src/_cursor-agent
+        run: zsh -n src/_cursor-agent
+      - name: Check zsh tooling (tests/*.zsh, tools/*.zsh)
+        # The (N) qualifier makes a glob with no matches expand to nothing,
+        # so the step passes while tools/ does not exist yet.
+        shell: zsh {0}
+        run: |
+          for f in tests/*.zsh(N) tools/*.zsh(N); do
+            print -r -- "zsh -n $f"
+            zsh -n "$f" || exit 1
+          done
+
+  tests:
+    name: tests
+    needs: syntax
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install zsh
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zsh
+      - name: Run completion test suite
+        run: zsh tests/run-tests.zsh
