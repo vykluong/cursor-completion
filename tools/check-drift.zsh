@@ -20,12 +20,17 @@
 #                         resolves to (any dir under ~/.local/share/cursor-agent/versions/)
 #   --static              mined half only; never execute the CLI
 #
-# Exit codes: 0 = no drift, 1 = drift, 2 = the tool itself could not run (no
-# `agent` on PATH, a bad version directory, or the miner needs attention).
+# Environment:
+#   CHECK_DRIFT_CACHE=<dir>  development aid: record every CLI run under
+#                            <dir>/<version>/ and replay it on later runs
 #
-# STATUS: only the static (mined) half exists. The help walk, the probes, the
-# mined-vs-help validation, and the check / snapshot / diff modes are stubs
-# that exit 2 with "not implemented". Use `dump --static`.
+# Exit codes: 0 = no drift, 1 = drift, 2 = the tool itself could not run (no
+# `agent` on PATH, a bad version directory, the miner needs attention, or a
+# CLI run did something unexpected).
+#
+# STATUS: `dump` (mined records, help walk, probes, mined-vs-help validation)
+# and `dump --static` work. The check / snapshot / diff modes are stubs that
+# exit 2 with "not implemented".
 #
 # Where the surface comes from. `agent` is not a native binary: it is a bash
 # wrapper that runs a bundled Node on a webpack bundle, <version-dir>/index.js,
@@ -91,8 +96,14 @@
 #         default=v  preset=v  env=VAR  conflicts=--flag,..  implies  prescan
 #   enum: values=a,b  source=validator|config-schema
 #
-# Nothing here ever executes `agent` yet. When the execution half lands, every
-# invocation must go through run_isolated (see the hazards in CLAUDE.md).
+# Without --static, the help walk and the probes append (see run_probes):
+#   help-listed | probe=recognized|unknown | static-only=<why>   on every
+#                         record but meta; probe-value=none|required (and
+#                         unknown-flags=..) on probed options
+#   walk=own-usage|fallback | not-walked=<why>   on cmd records
+#
+# Every execution of `agent` goes through run_isolated (see the hazards in
+# CLAUDE.md).
 
 emulate -L zsh
 setopt extended_glob no_unset pipe_fail
@@ -105,10 +116,17 @@ typeset -g SNAPSHOT=${SCRIPT_PATH:h}/cli-surface.txt
 typeset -g OPT_VERSION_DIR='' VERSION_DIR='' VERSION=''
 typeset -gi STATIC_ONLY=0
 
-typeset -ga _TMPFILES=()
+typeset -ga _TMPFILES=() _TMPDIRS=()
 
-_cleanup() { (( ${#_TMPFILES} )) && rm -f -- "${_TMPFILES[@]}"; return 0 }
-trap _cleanup EXIT INT TERM
+_cleanup() {
+  (( ${#_TMPFILES} )) && rm -f -- "${_TMPFILES[@]}"
+  (( ${#_TMPDIRS} )) && rm -rf -- "${_TMPDIRS[@]}"
+  _TMPFILES=() _TMPDIRS=()
+  return 0
+}
+trap _cleanup EXIT
+trap '_cleanup; exit 130' INT
+trap '_cleanup; exit 143' TERM
 
 die() { print -ru2 -- "check-drift: $*"; exit 2 }
 
@@ -1161,53 +1179,745 @@ mine_static() {
 }
 
 # ---------------------------------------------------------------------------
-# Execution half: NOT IMPLEMENTED YET (next unit)
+# Execution half: running the CLI
 # ---------------------------------------------------------------------------
+#
+# The rules below come from a safety analysis of this CLI (the hazards in
+# CLAUDE.md are the short form):
+#   - Only two argv shapes are ever run: `<words> --help` on a registered
+#     command path, and the option probe `<words> <flag> --zz-bogus-1
+#     --zz-bogus-2`. A required value eats --zz-bogus-1 and the root parser
+#     shadowing a leaf option eats at most one more token, so --zz-bogus-2 is
+#     always left over as an unknown option and the line cannot parse cleanly.
+#     Shorter probes can: `agent --resume` resumes a chat, and `agent worker
+#     start --data-dir --zz-bogus` starts a worker (the root's own hidden
+#     --data-dir takes the bogus flag as its value).
+#   - `persist` is dispatched on raw argv before commander. Only exactly
+#     `persist --help` is safe; `persist attach --help` runs tmux with
+#     `--help` as the session name.
+#   - Gated and dev-only commands are not registered in isolation, so any
+#     line naming them is a root prompt line. They are never run.
+#   - Never `--help` after an option (a required option would take it as its
+#     value), and never a positional word (a prompt starts a session).
 
-not_implemented() {
-  die "not implemented: $1 (only the static half exists so far; use: dump --static)"
+typeset -gi RUN_RC=0 RUN_COUNT=0 RUN_CAP=20 GUARD_READY=0
+typeset -g RUN_OUT='' RUN_ERR='' RUNNER_PL=''
+# Guard tables, filled from the mined records by guard_init.
+typeset -gA GUARD_PATHS GUARD_DENY GUARD_NOPROBE
+
+# The runner: forks the CLI in its own process group with an environment built
+# from scratch, waits up to <cap> seconds, then TERM to the group, 3 s grace,
+# KILL. It also kills the group if it is interrupted or its parent goes away,
+# and reaps anything the CLI left running. Writes `<exit> <signal> <killed>
+# <leftover>` to <dir>/status; exits 130 if it was interrupted.
+write_runner() {
+  cat <<'PERL'
+use strict;
+use warnings;
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+
+my ($d, $cap, $exe, @argv) = @ARGV;
+# AGENT_CLI_CREDENTIAL_STORE=memory keeps the CLI away from the login
+# keychain; TMPDIR keeps its debug logs out of the shared /tmp log dir.
+my %env = (
+  PATH => '/usr/bin:/bin:/usr/sbin:/sbin',
+  HOME => "$d/home",
+  CURSOR_CONFIG_DIR => "$d/home/.cursor",
+  TMPDIR => "$d/tmp",
+  TERM => 'dumb',
+  LANG => 'en_US.UTF-8',
+  AGENT_CLI_CREDENTIAL_STORE => 'memory',
+);
+my $parent = getppid();
+my $stop = '';
+$SIG{$_} = sub { $stop ||= shift } for qw(INT TERM HUP);
+my $pid = fork;
+defined $pid or die "fork: $!\n";
+if (!$pid) {
+  $SIG{$_} = 'DEFAULT' for qw(INT TERM HUP);
+  setpgrp(0, 0);
+  chdir "$d/cwd" or POSIX::_exit(126);
+  open STDIN, '<', '/dev/null';
+  open STDOUT, '>', "$d/out";
+  open STDERR, '>', "$d/err";
+  exec { '/usr/bin/env' } '/usr/bin/env', '-i', (map { "$_=$env{$_}" } sort keys %env), $exe, @argv
+    or POSIX::_exit(127);
+}
+eval { setpgrp($pid, $pid) };    # also here, so no kill can race the child's own call
+my ($st, $killed, $deadline) = (0, '', time + $cap);
+while (1) {
+  if (waitpid($pid, WNOHANG) == $pid) { $st = $?; last }
+  $deadline = 0 if ($stop || getppid() != $parent) && !$killed;
+  if (time > $deadline) {
+    if (!$killed) { kill 'TERM', -$pid; $killed = 'TERM'; $deadline = time + 3 }
+    elsif ($killed eq 'TERM') { kill 'KILL', -$pid; $killed = 'KILL' }
+  }
+  sleep 0.05;
+}
+my $left = kill(0, -$pid) ? 1 : 0;
+if ($left) { kill 'TERM', -$pid; sleep 1; kill 'KILL', -$pid }
+open my $fh, '>', "$d/status" or die "status: $!\n";
+printf $fh "%d %d %s %d\n", $st >> 8, $st & 127, $killed || 'none', $left;
+close $fh;
+exit($stop ? 130 : 0);
+PERL
 }
 
-# run_isolated <secs> <args...>
-# Run `<version-dir>/cursor-agent <args...>` with a throwaway HOME and
-# CURSOR_CONFIG_DIR, a scrubbed environment (no CURSOR_* / AGENT_CLI_*),
-# </dev/null, and a wall-clock cap that reaps children. The only place the CLI
-# may ever be executed. Must refuse `persist attach|stop ...` and any argv
-# that could parse cleanly into a session (bare booleans, positional words).
-run_isolated() { not_implemented "run_isolated" }
+# guard_argv <args...>
+# The safety net under every execution, deliberately independent of the walk
+# and probe logic: succeeds only for
+#   persist --help                              exactly these two words
+#   <words> --help                              the help walk
+#   <words> <flag> --zz-bogus-1 --zz-bogus-2    the option probe
+# where <words> are bare command words naming a registered command path that
+# is neither gated nor dev-only, and <flag> is a bare flag that is not a help,
+# version or `worker --pool` flag, on a path that does not accept unknown
+# options. On refusal, sets REPLY to the reason.
+guard_argv() {
+  local -a w=("$@") words=()
+  local opt='' word cmdpath prefix
+  REPLY=''
+  (( GUARD_READY )) || { REPLY="no mined command paths loaded"; return 1 }
+  (( $#w )) || { REPLY="empty argv"; return 1 }
+  if [[ $w[1] == persist ]]; then
+    (( $#w == 2 )) && [[ $w[2] == --help ]] && return 0
+    REPLY="under persist only 'persist --help' may run"
+    return 1
+  fi
+  if [[ $w[-1] == --help ]]; then
+    words=("${(@)w[1,-2]}")
+  elif (( $#w >= 3 )) && [[ $w[-2] == --zz-bogus-1 && $w[-1] == --zz-bogus-2 ]]; then
+    opt=$w[-3]
+    words=("${(@)w[1,-4]}")
+    [[ $opt == (-[A-Za-z]|--[A-Za-z][A-Za-z0-9-]#) ]] || { REPLY="'$opt' is not a bare flag"; return 1 }
+    [[ $opt == (-h|--help|-v|--version|--zz-bogus-*|--cursor-persist-restore) ]] &&
+      { REPLY="'$opt' is never probed"; return 1 }
+    if [[ $opt == --pool* ]] && (( ${words[(Ie)worker]} )); then
+      REPLY="'$opt' under worker is rewritten before commander"
+      return 1
+    fi
+  else
+    REPLY="neither '<command> --help' nor '<command> <flag> --zz-bogus-1 --zz-bogus-2'"
+    return 1
+  fi
+  for word in $words; do
+    [[ $word == [a-z][a-z0-9-]# ]] || { REPLY="'$word' is not a command word"; return 1 }
+  done
+  cmdpath=agent${words:+ ${(j: :)words}}
+  prefix=agent
+  for word in $words; do
+    prefix+=" $word"
+    [[ -n ${GUARD_DENY[$prefix]-} ]] && { REPLY="'$prefix' is ${GUARD_DENY[$prefix]}"; return 1 }
+  done
+  [[ -n ${GUARD_PATHS[$cmdpath]-} ]] || { REPLY="'$cmdpath' is not a registered command path"; return 1 }
+  if [[ -n $opt && -n ${GUARD_NOPROBE[$cmdpath]-} ]]; then
+    REPLY="options of '$cmdpath' are never probed (${GUARD_NOPROBE[$cmdpath]})"
+    return 1
+  fi
+  return 0
+}
+
+# Registered paths and the never-run ones, from the mined records.
+guard_init() {
+  local line p
+  local -a F
+  GUARD_PATHS=(agent registered)
+  GUARD_DENY=('agent persist' 'dispatched before commander')
+  GUARD_NOPROBE=()
+  for line in $MINED_LINES; do
+    F=("${(@s: | :)line}")
+    [[ $F[1] == cmd ]] || continue
+    p="$F[2] $F[3]"
+    case $F[4] in
+      gated:*)  GUARD_DENY[$p]="gated ($F[4])" ;;
+      dev-only) GUARD_DENY[$p]="dev-only" ;;
+      *)        (( ${F[(Ie)builtin]} )) || GUARD_PATHS[$p]=registered ;;
+    esac
+    (( ${F[(Ie)allowUnknownOption=true]} )) && GUARD_NOPROBE[$p]="allowUnknownOption: the action would run"
+  done
+  GUARD_READY=1
+}
+
+# run_isolated <args...>
+# The only place the CLI is ever executed: `<version-dir>/cursor-agent
+# <args...>` after guard_argv, in a fresh throwaway directory (HOME,
+# CURSOR_CONFIG_DIR, TMPDIR, and the cwd, which is outside any git repo),
+# stdin </dev/null, capped at RUN_CAP seconds. Sets RUN_RC, RUN_OUT, RUN_ERR.
+# Exits 2 if the run was killed or left processes behind: a line may have
+# parsed cleanly, so nothing after it can be trusted.
+#
+# CHECK_DRIFT_CACHE=<dir> (a development aid) keeps each result under
+# <dir>/<version>/ and replays it on the next run instead of executing.
+run_isolated() {
+  guard_argv "$@" || die "run_isolated refused 'agent $*': $REPLY"
+  local d key cache=''
+  local -a st
+  key=${(j:__:)@}
+  if [[ -n ${CHECK_DRIFT_CACHE-} ]]; then
+    cache=${CHECK_DRIFT_CACHE:A}/$VERSION
+    if [[ -r $cache/$key.rc ]]; then
+      RUN_RC=$(<$cache/$key.rc) RUN_OUT=$(<$cache/$key.out) RUN_ERR=$(<$cache/$key.err)
+      return 0
+    fi
+  fi
+  [[ -n $RUNNER_PL ]] || { new_tmpfile; RUNNER_PL=$REPLY; write_runner >|"$RUNNER_PL" }
+  d=$(mktemp -d "${TMPDIR:-/tmp}/check-drift.XXXXXX") || die "mktemp -d failed"
+  _TMPDIRS+=("$d")
+  mkdir -p -- "$d/home" "$d/tmp" "$d/cwd" || die "cannot populate $d"
+  perl -- "$RUNNER_PL" "$d" "$RUN_CAP" "$VERSION_DIR/cursor-agent" "$@"
+  case $? in
+    0)   ;;
+    130) die "interrupted while running 'agent $*'" ;;
+    *)   die "the runner failed on 'agent $*'" ;;
+  esac
+  (( RUN_COUNT++ ))
+  st=(${=$(<$d/status)})
+  [[ $st[3] == none ]] ||
+    die "stopping: 'agent $*' ran into the ${RUN_CAP}s cap and was killed ($st[3]); it may have parsed cleanly"
+  (( st[4] == 0 )) || die "stopping: 'agent $*' left processes running in its group (reaped)"
+  (( st[2] == 0 )) || die "stopping: 'agent $*' died of signal $st[2]"
+  RUN_RC=$st[1] RUN_OUT=$(<$d/out) RUN_ERR=$(<$d/err)
+  rm -rf -- "$d"
+  _TMPDIRS=("${(@)_TMPDIRS:#$d}")
+  if [[ -n $cache ]]; then
+    mkdir -p -- "$cache" &&
+      print -r -- "$RUN_RC" >|"$cache/$key.rc" &&
+      print -r -- "$RUN_OUT" >|"$cache/$key.out" &&
+      print -r -- "$RUN_ERR" >|"$cache/$key.err"
+  fi
+  return 0
+}
+
+# --- mined facts, indexed by command path -----------------------------------
+
+typeset -ga MINED_LINES=()
+typeset -gA TIER_OF ALIAS_OF KIDS HAS_OPTS HAS_KIDS ARGS_OF ROOT_FLAGS MANDATORY
+typeset -gA WALK HELP_USAGE HELP_OPTS HELP_CMDS HELP_KIDS HELP_TEXT ATTR
+typeset -ga VALIDATION=()
+typeset -gi N_HELP=0 N_PROBES=0
+
+# Registered in isolation: neither gated nor dev-only.
+registered_tier() { [[ $1 != (gated:*|dev-only) ]] }
+
+# Why a gated or dev-only entry is never run.
+tier_reason() { [[ $1 == dev-only ]] && print -r -- "dev-only: compiled out" || print -r -- "gated: not registered in isolation" }
+
+# The entry's own hidden flag (hidden, or hidden=cond: decided at run time).
+own_hidden() { (( ${argv[(Ie)hidden]} || ${argv[(Ie)hidden=cond]} )) }
+
+load_mined() {
+  local line p
+  local -a F
+  local -A argpos
+  local k s
+  local -i i
+  MINED_LINES=("${(@f)$(<$1)}")
+  TIER_OF=(agent visible)
+  for line in $MINED_LINES; do
+    F=("${(@s: | :)line}")
+    case $F[1] in
+      cmd)
+        (( ${F[(Ie)builtin]} )) && continue
+        p="$F[2] $F[3]"
+        TIER_OF[$p]=$F[4]
+        KIDS[$F[2]]+=" $F[3]"
+        ALIAS_OF[$p]=${${${(M)F[5,-1]:#aliases=*}#aliases=}%%,*}
+        registered_tier $F[4] && HAS_KIDS[$F[2]]=1
+        ;;
+      opt)
+        (( ${F[(Ie)builtin]} )) && continue
+        registered_tier $F[4] || continue
+        HAS_OPTS[$F[2]]=1
+        (( ${F[(Ie)mandatory]} )) && MANDATORY[$F[2]]=$F[3]
+        if [[ $F[2] == agent ]]; then
+          for p in ${(M)${(s:, :)${F[3]%% [<\[]*}}:#-*}; do ROOT_FLAGS[$p]=1; done
+        fi
+        ;;
+      arg)
+        s=${${(M)F[5,-1]:#pos=*}#pos=}
+        k="$F[2]|$s"
+        argpos[$k]=$F[3]
+        ;;
+    esac
+  done
+  # Arguments in position order, as commander prints them.
+  for k in ${(k)argpos}; do
+    p=${k%\|*}
+    [[ -n ${ARGS_OF[$p]-} ]] && continue
+    s='' i=1
+    while [[ -n ${argpos[$p|$i]-} ]]; do s+=" ${argpos[$p|$i]}"; (( i++ )); done
+    ARGS_OF[$p]=${s# }
+  done
+  guard_init
+}
+
+# The flags of an option spec: `-e, --endpoint <url>` -> -e --endpoint.
+spec_flags() { reply=(${(M)${(s:, :)${1%% [<\[]*}}:#-*}) }
+
+# Render an attribute value the way the miner does: quoted if it contains a
+# space, comma, `|`, `"` or `=`.
+attr_val() {
+  if [[ $1 == *[[:space:],\|\"=]* ]]; then REPLY="\"${${1//\\/\\\\}//\"/\\\"}\""; else REPLY=$1; fi
+}
+
+# has_line <s> <text> / has_word <s> <text>: <s> is a whole line / word of
+# <text>. (A nested `${${(f)x}[(Ie)s]}` silently becomes a substring search
+# when x has a single line, so lookups go through these.)
+has_line() { local -a l=("${(@f)2}"); (( ${l[(Ie)$1]} )) }
+has_word() { local -a l=(${=2}); (( ${l[(Ie)$1]} )) }
+
+add_attr() {
+  local line=$1 name=$2
+  if (( $# > 2 )); then attr_val "$3"; ATTR[$line]+=" | $name=$REPLY"; else ATTR[$line]+=" | $name"; fi
+}
+
+# ---------------------------------------------------------------------------
+# Help walk
+# ---------------------------------------------------------------------------
+
+# Parse one help screen (the lines after its usage line) into HELP_OPTS and
+# HELP_CMDS (one term per line: the text before the description column) and
+# HELP_KIDS (command names). Commander pads every term to one width, so the
+# section's first entry fixes the description column, and a later line is an
+# entry only if it has a term at indent two, then at least two spaces of
+# padding up to that column. Everything else is description text, which may
+# itself contain lines at indent two (a description with raw newlines). Any
+# heading ending in "Options:" holds options; other sections (Arguments:,
+# addHelpText) are not part of the surface.
+parse_help() {
+  local p=$1 line section='' term pre
+  local -i col=0
+  shift
+  for line in "$@"; do
+    if [[ -z $line ]]; then section='' col=0; continue; fi
+    if [[ $line == [A-Z][^:]#: ]]; then section=$line col=0; continue; fi
+    [[ $line == '  '[^[:space:]]* ]] || continue
+    if (( col == 0 )); then
+      term=${${line#  }%%  *}
+      pre=${${line#  }#$term}
+      col=$(( 2 + ${#term} + ${#${pre%%[^ ]*}} ))
+    else
+      pre=${line[3,col]}
+      term=${pre%%  *}
+      [[ ${pre#$term} == '  '(' ')# ]] || (( ${#line} <= col && ${#term} == ${#pre} )) || continue
+      [[ ${line[col+1]-} != ' ' ]] || continue
+    fi
+    case $section in
+      *Options:)
+        [[ $term == -* ]] && HELP_OPTS[$p]+=$term$'\n' ;;
+      Commands:)
+        HELP_CMDS[$p]+=$term$'\n'
+        HELP_KIDS[$p]+=${${term%% *}%%\|*}$'\n' ;;
+    esac
+  done
+}
+
+# walk_one <path>: run `agent <words> --help` and record WALK[path]:
+# own-usage (the output starts with this command's own usage line), or
+# fallback (a parent's or the root's usage line: not registered).
+walk_one() {
+  local p=$1 first pre
+  local -a words=(${=p}) lines pw
+  shift words
+  local -i k
+  run_isolated $words --help
+  (( N_HELP++ ))
+  (( RUN_RC == 0 )) && [[ -z $RUN_ERR ]] ||
+    die "stopping: 'agent $words --help' exited $RUN_RC: ${RUN_ERR%%$'\n'*}"
+  HELP_TEXT[$p]=$RUN_OUT
+  lines=("${(@f)RUN_OUT}")
+  first=${lines[1]-}
+  # `persist --help` is static text from the pre-commander dispatcher, with
+  # its usage on the second line.
+  if [[ $p == 'agent persist' ]]; then
+    [[ $first == Usage: && ${lines[2]-} == '  agent persist'(| *) ]] ||
+      die "stopping: 'agent persist --help' does not start with 'Usage:' / '  agent persist': '$first'"
+    WALK[$p]=own-usage
+    HELP_USAGE[$p]=${lines[2]#  }
+    parse_help "$p" "${(@)lines[3,-1]}"
+    return 0
+  fi
+  if [[ $first == "Usage: $p"(|\|[^ ]##)" [options]"(| *) ]]; then
+    WALK[$p]=own-usage
+    HELP_USAGE[$p]=${first#Usage: }
+    parse_help "$p" "${(@)lines[2,-1]}"
+    return 0
+  fi
+  pw=(${=p})
+  for (( k = $#pw - 1; k >= 1; k-- )); do
+    pre=${(j: :)pw[1,k]}
+    if [[ $first == "Usage: $pre"(|\|[^ ]##)" [options]"(| *) ]]; then
+      WALK[$p]=fallback
+      return 0
+    fi
+  done
+  die "stopping: 'agent $words --help' printed neither its own usage line nor a parent's: '$first'"
+}
 
 # help_walk
-# Recursive `agent ${=c} --help` from the root over every child that help or
-# the miner reports, guarded by each command's own `Usage:` line (root-help
-# fallback means "not registered"). Denylist: persist attach, persist stop.
-help_walk() { not_implemented "help walk" }
+# Breadth-first from the root over every child that the miner or a help
+# screen reports, children in sorted order. Not walked, with the reason in
+# WALK: gated and dev-only commands, the children of `persist`, and the
+# builtin `help` commands (their --help prints the parent's help).
+help_walk() {
+  local -a queue=(agent) kids
+  local p kid c
+  while (( $#queue )); do
+    p=$queue[1]
+    shift queue
+    walk_one "$p"
+    [[ $WALK[$p] == own-usage ]] || continue
+    kids=(${=KIDS[$p]-} ${(f)HELP_KIDS[$p]-})
+    for kid in ${(ou)kids}; do
+      c="$p $kid"
+      [[ -n ${WALK[$c]-} || $kid == help ]] && continue
+      if [[ $p == 'agent persist' ]]; then
+        WALK[$c]='not-walked:persist: dispatched before commander'
+        continue
+      fi
+      case ${TIER_OF[$c]-} in
+        gated:*)  WALK[$c]='not-walked:gated: not registered in isolation'; continue ;;
+        dev-only) WALK[$c]='not-walked:dev-only: compiled out'; continue ;;
+        '')       GUARD_PATHS[$c]=help-listed ;;   # unmined; the validation names it
+      esac
+      queue+=("$c")
+    done
+  done
+}
+
+# ---------------------------------------------------------------------------
+# Probes and classification
+# ---------------------------------------------------------------------------
+#
+# Every record except meta gets exactly one of:
+#   help-listed          shown by a walked help screen (option and command
+#                        lists, the usage line's arguments)
+#   probe=recognized     not listed, but the CLI accepts it: a command whose
+#   probe=unknown        --help prints its own usage line, or an option the
+#                        probe below does not reject; `unknown` otherwise
+#   static-only=<why>    never executed, for the stated reason
+# Command records also get walk=own-usage, walk=fallback (not registered), or
+# not-walked=<why>. An option probe adds probe-value=none|required, which
+# must agree with the mined value=: a disagreement means the miner is wrong.
+
+# probe_flag <path> <flag>: run the option probe; sets REPLY to unknown,
+# none (recognized, takes no required value), required, or masked=<spec>.
+probe_flag() {
+  local p=$1 flag=$2 e1 tok
+  local -a words=(${=p})
+  shift words
+  run_isolated $words $flag --zz-bogus-1 --zz-bogus-2
+  (( N_PROBES++ ))
+  e1=${RUN_ERR%%$'\n'*}
+  (( RUN_RC == 1 )) && [[ -z $RUN_OUT ]] ||
+    die "stopping: probe 'agent $words $flag --zz-bogus-1 --zz-bogus-2' exited $RUN_RC (stdout ${RUN_OUT:+not }empty): $e1"
+  if [[ $e1 == "error: unknown option '"*"'" ]]; then
+    tok=${${e1#*\'}%\'}
+    case $tok in
+      $flag|$flag=*) REPLY=unknown ;;
+      --zz-bogus-1)  REPLY=none ;;
+      --zz-bogus-2)  REPLY=required ;;
+      *) die "stopping: probe of $flag on '$p' reported unknown option '$tok'" ;;
+    esac
+  elif [[ $e1 == "error: option '"*"' argument '--zz-bogus-1' is invalid."* || $e1 == 'Error: '* ]]; then
+    REPLY=required      # a choices list or a custom parser rejected --zz-bogus-1
+  elif [[ $e1 == "error: required option '"*"' not specified" ]]; then
+    REPLY="masked=${${e1#*\'}%\'*}"
+  else
+    die "stopping: probe of $flag on '$p' gave an unexpected result: $e1"
+  fi
+}
+
+# Why an option on <path> with <flags> may not be probed, in REPLY; or fail.
+option_static_reason() {
+  local p=$1 a f
+  shift
+  if [[ -n ${GUARD_NOPROBE[$p]-} ]]; then REPLY=$GUARD_NOPROBE[$p]; return 0; fi
+  # A mandatory option on the command or an ancestor fails the line before
+  # the unknown-option check.
+  for a in ${(k)MANDATORY}; do
+    if [[ $p == $a || $p == "$a "* ]]; then
+      REPLY="required option ${MANDATORY[$a]} masks unknown options"
+      return 0
+    fi
+  done
+  # The root parser consumes its own options anywhere in argv, so a leaf
+  # option of the same name can only ever be measured as the root's.
+  if [[ $p != agent ]]; then
+    for f in "$@"; do
+      if (( ${+ROOT_FLAGS[$f]} )); then REPLY="shadowed by root option $f"; return 0; fi
+    done
+  fi
+  for f in "$@"; do
+    [[ $f == (-h|--help|-v|--version) ]] && { REPLY="$f exits during parsing"; return 0 }
+  done
+  return 1
+}
+
+classify_opt() {
+  local line=$1 p=$2 spec=$3 tier=$4 f r=none res mined
+  shift 4
+  local -a unknown=()
+  if ! registered_tier $tier; then
+    add_attr "$line" static-only "$(tier_reason $tier)"; return
+  fi
+  if [[ $p == 'agent persist'(| *) ]]; then
+    add_attr "$line" static-only "persist: dispatched before commander"; return
+  fi
+  case ${WALK[$p]-} in
+    own-usage) ;;
+    fallback) add_attr "$line" probe unknown; return ;;
+    not-walked:*) add_attr "$line" static-only "${WALK[$p]#not-walked:}"; return ;;
+    *) return ;;
+  esac
+  if has_line "$spec" "${HELP_OPTS[$p]-}"; then add_attr "$line" help-listed; return; fi
+  own_hidden "$@" || return          # shown but not listed: the validation reports it
+  spec_flags "$spec"
+  local -a flags=($reply)
+  if option_static_reason "$p" $flags; then add_attr "$line" static-only "$REPLY"; return; fi
+  for f in $flags; do
+    probe_flag "$p" "$f"
+    res=$REPLY
+    case $res in
+      unknown)  unknown+=($f) ;;
+      masked=*) add_attr "$line" static-only "required option ${res#masked=} masks unknown options"; return ;;
+      *)        r=$res ;;
+    esac
+  done
+  if (( $#unknown )); then
+    add_attr "$line" probe unknown
+    (( $#unknown < $#flags )) && add_attr "$line" unknown-flags ${(j:,:)unknown}
+    return
+  fi
+  add_attr "$line" probe recognized
+  add_attr "$line" probe-value $r
+  mined=${${(M)argv:#value=*}#value=}
+  [[ ${mined/optional/none} == $r ]] ||
+    VALIDATION+=("$p: option '$spec' is mined as value=$mined, but the probe finds value=$r")
+}
+
+classify_cmd() {
+  local line=$1 parent=$2 name=$3 tier=$4 c="$2 $3"
+  shift 4
+  if ! registered_tier $tier; then
+    add_attr "$line" static-only "$(tier_reason $tier)"
+    add_attr "$line" not-walked "$(tier_reason $tier)"
+    return
+  fi
+  if (( ${argv[(Ie)builtin]} )); then
+    if [[ $parent == 'agent persist' ]]; then
+      add_attr "$line" static-only "persist: dispatched before commander"
+    elif [[ ${WALK[$parent]-} != own-usage ]]; then
+      add_attr "$line" static-only "parent not walked"
+    elif has_line "$name" "${HELP_KIDS[$parent]-}"; then
+      add_attr "$line" help-listed
+    fi
+    add_attr "$line" not-walked "builtin: prints the parent's help"
+    return
+  fi
+  case ${WALK[$c]-} in
+    not-walked:*)
+      add_attr "$line" static-only "${WALK[$c]#not-walked:}"
+      add_attr "$line" not-walked "${WALK[$c]#not-walked:}"
+      return ;;
+    '')
+      add_attr "$line" static-only "parent not walked"
+      add_attr "$line" not-walked "parent not walked"
+      return ;;
+  esac
+  if has_line "$name" "${HELP_KIDS[$parent]-}"; then
+    add_attr "$line" help-listed
+  elif [[ $WALK[$c] == own-usage ]]; then
+    add_attr "$line" probe recognized
+  else
+    add_attr "$line" probe unknown
+  fi
+  add_attr "$line" walk $WALK[$c]
+}
+
+classify_arg() {
+  local line=$1 p=$2 spec=$3 tier=$4 term
+  if ! registered_tier $tier; then
+    add_attr "$line" static-only "$(tier_reason $tier)"; return
+  fi
+  if [[ $p == 'agent persist '* ]]; then
+    add_attr "$line" static-only "persist: dispatched before commander"; return
+  fi
+  if [[ ${WALK[$p]-} == own-usage ]] && has_word "$spec" "$HELP_USAGE[$p]"; then
+    add_attr "$line" help-listed; return
+  fi
+  # The parent's command list shows each child's arguments (the builtin
+  # `help [command]` is only ever seen there).
+  for term in ${(f)HELP_CMDS[${p% *}]-}; do
+    if [[ ${${term%% *}%%\|*} == ${p##* } ]] && has_word "$spec" "$term"; then
+      add_attr "$line" help-listed; return
+    fi
+  done
+  [[ ${WALK[$p]-} == not-walked:* ]] && add_attr "$line" static-only "${WALK[$p]#not-walked:}"
+}
+
+classify_other() {
+  local line=$1 kind=$2 p=$3 name=$4 value=${6-}
+  case $kind in
+    enum)    add_attr "$line" static-only "validator outside commander" ;;
+    prescan) add_attr "$line" static-only "raw-argv prescan without a registration" ;;
+    grammar)
+      if [[ $p == 'agent persist' && $name == usage ]] &&
+         has_line "  $value" "${HELP_TEXT[$p]-}"; then
+        add_attr "$line" help-listed
+      elif [[ $p == 'agent persist' ]]; then
+        add_attr "$line" static-only "persist: dispatched before commander"
+      else
+        add_attr "$line" static-only "argv rewrite before commander"
+      fi ;;
+  esac
+}
 
 # run_probes
-# Command: own usage line means invokable. Value-taking option: value missing
-# gives `argument missing` (recognized) or `unknown option`. Boolean option:
-# `<path> --flag --zz-bogus` must name --zz-bogus. Records carrying
-# `prescan`, and everything under `agent persist`, stay static only.
-run_probes() { not_implemented "probes" }
+# Classify every mined record (see above), probing what no help screen shows.
+run_probes() {
+  local line
+  local -a F
+  for line in $MINED_LINES; do
+    F=("${(@s: | :)line}")
+    case $F[1] in
+      opt)  classify_opt "$line" "${(@)F[2,-1]}" ;;
+      cmd)  classify_cmd "$line" "${(@)F[2,-1]}" ;;
+      arg)  classify_arg "$line" "${(@)F[2,-1]}" ;;
+      meta) ;;
+      *)    classify_other "$line" "${(@)F}" ;;
+    esac
+  done
+}
+
+# ---------------------------------------------------------------------------
+# Self-validation
+# ---------------------------------------------------------------------------
+
+# Compare two newline-separated sets; record differences in VALIDATION.
+compare_sets() {
+  local where=$1 what=$2 x
+  local -a mined=(${(f)3}) listed=(${(f)4})
+  for x in ${(o)listed}; do
+    (( ${mined[(Ie)$x]} )) || VALIDATION+=("$where: help lists $what '$x', which the miner does not report as shown")
+  done
+  for x in ${(o)mined}; do
+    (( ${listed[(Ie)$x]} )) || VALIDATION+=("$where: the miner reports $what '$x' as shown, but help does not list it")
+  done
+}
 
 # validate_mined_vs_help
-# Self-validation: the mined visible surface must equal the help-walked
-# surface exactly; any mismatch exits 2 with "miner needs attention", naming
-# the disagreeing entries.
-validate_mined_vs_help() { not_implemented "mined-vs-help validation" }
+# The miner reads minified bundle shapes, so it is checked against the
+# second, independent source on every run: on each walked screen, the listed
+# options (full spec, so the value shape too), the listed commands (name,
+# first alias, `[options]` if it has any, arguments) and the usage line
+# (alias, `[command]`, arguments) must equal what the mined records predict.
+# A `hidden=cond` entry may go either way and is left out on both sides.
+# Any difference exits 2 with "miner needs attention", naming the entries.
+validate_mined_vs_help() {
+  local p line want c term listed_cmds listed_opts
+  local -a F lines usages
+  local -A mopts mcmds cond
+  for line in $MINED_LINES; do
+    F=("${(@s: | :)line}")
+    [[ $F[1] == (opt|cmd) ]] && registered_tier $F[4] || continue
+    if (( ${F[(Ie)hidden=cond]} )); then c="$F[1]|$F[2]|$F[3]"; cond[$c]=1; continue; fi
+    own_hidden "${(@)F[5,-1]}" && continue
+    if [[ $F[1] == opt ]]; then
+      mopts[$F[2]]+=$F[3]$'\n'
+    else
+      c="$F[2] $F[3]"
+      term=$F[3]${ALIAS_OF[$c]:+|$ALIAS_OF[$c]}
+      (( ${+HAS_OPTS[$c]} )) && term+=' [options]'
+      [[ -n ${ARGS_OF[$c]-} ]] && term+=" $ARGS_OF[$c]"
+      mcmds[$F[2]]+=$term$'\n'
+    fi
+  done
+  for p in ${(ok)WALK}; do
+    case $WALK[$p] in
+      own-usage) ;;
+      fallback)
+        VALIDATION+=("$p: the miner reports this command, but its --help falls back to a parent's (not registered)")
+        continue ;;
+      *) continue ;;
+    esac
+    if [[ -z ${TIER_OF[$p]-} ]]; then
+      VALIDATION+=("$p: help lists this command, which the miner does not report")
+      continue
+    fi
+    if [[ $p == 'agent persist' ]]; then
+      # Static text: its usage lines must be the mined persist grammar.
+      usages=()
+      lines=(${(M)${(f)HELP_TEXT[$p]}:#  agent persist*})
+      for line in $MINED_LINES; do
+        [[ $line == 'grammar | agent persist | usage | '* ]] && usages+=("  ${${(s: | :)line}[5]}")
+      done
+      compare_sets "$p" "usage line" "${(F)usages}" "${(F)lines}"
+      continue
+    fi
+    want="$p${ALIAS_OF[$p]:+|$ALIAS_OF[$p]} [options]"
+    (( ${+HAS_KIDS[$p]} )) && want+=' [command]'
+    [[ -n ${ARGS_OF[$p]-} ]] && want+=" $ARGS_OF[$p]"
+    [[ $HELP_USAGE[$p] == $want ]] ||
+      VALIDATION+=("$p: usage line is '$HELP_USAGE[$p]', the miner predicts '$want'")
+    listed_cmds='' listed_opts=''
+    for term in ${(f)HELP_CMDS[$p]-}; do
+      (( ${+cond[cmd|$p|${${term%% *}%%\|*}]} )) || listed_cmds+=$term$'\n'
+    done
+    for term in ${(f)HELP_OPTS[$p]-}; do
+      (( ${+cond[opt|$p|$term]} )) || listed_opts+=$term$'\n'
+    done
+    compare_sets "$p" option "${mopts[$p]-}" "$listed_opts"
+    compare_sets "$p" command "${mcmds[$p]-}" "$listed_cmds"
+  done
+  # Every record must have been classified. (A shown entry missing from a
+  # compared screen is unclassified too, but already reported above.)
+  for line in $MINED_LINES; do
+    [[ $line == 'meta | '* || -n ${ATTR[$line]-} ]] && continue
+    F=("${(@s: | :)line}")
+    p=$F[2]
+    [[ $F[1] == arg ]] && p=${p% *}       # an argument is also checked on its parent's screen
+    if [[ $F[1] == (opt|cmd|arg) && $p != 'agent persist'(| *) && ${WALK[$p]-} == own-usage ]] &&
+       ! own_hidden "${(@)F[5,-1]}"; then
+      continue
+    fi
+    VALIDATION+=("$F[2]: record not classified: $line")
+  done
+  if (( $#VALIDATION )); then
+    print -ru2 -- "check-drift: miner needs attention: the mined surface and the help walk disagree:"
+    print -ru2 -l -- "  "${^VALIDATION}
+    exit 2
+  fi
+}
 
 # ---------------------------------------------------------------------------
 # Dump builder and modes
 # ---------------------------------------------------------------------------
 
 build_dump() {
+  local mined line
   print -r -- "# Cursor CLI surface, generated by tools/check-drift.zsh"
   print -r -- "# Do not hand-edit; regenerate with: zsh tools/check-drift.zsh snapshot"
-  mine_static "$VERSION_DIR"
-  if (( ! STATIC_ONLY )); then
-    help_walk
-    run_probes
-    validate_mined_vs_help
+  new_tmpfile; mined=$REPLY
+  mine_static "$VERSION_DIR" >|"$mined"
+  if (( STATIC_ONLY )); then
+    cat -- "$mined"
+    return 0
   fi
+  load_mined "$mined"
+  help_walk
+  run_probes
+  validate_mined_vs_help
+  for line in $MINED_LINES; do print -r -- "$line${ATTR[$line]-}"; done | sort
+  local -a a=("${(@v)ATTR}")
+  local -i nr=${#${(M)a:#* probe=recognized*}} nu=${#${(M)a:#* probe=unknown*}} ns=${#${(M)a:#* static-only=*}}
+  print -ru2 -- "check-drift: $N_HELP help screens, $N_PROBES option probes; records:" \
+    "$nr probe=recognized, $nu probe=unknown, $ns static-only; $RUN_COUNT CLI executions"
+}
+
+not_implemented() {
+  die "not implemented: $1 (only dump exists so far)"
 }
 
 mode_check()    { not_implemented "check mode" }
