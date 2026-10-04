@@ -1,0 +1,61 @@
+#compdef agent cursor-agent
+
+# ZSH completion script for the Cursor CLI (agent / cursor-agent)
+# Target: Cursor CLI 2026.10.01-e373342
+#
+# SCAFFOLD STUB: this file only proves the test harness works end to end. It
+# covers a tiny handful of visible entries and will be replaced in plan step 3
+# by a script written from the generated snapshot (tools/cli-surface.txt).
+#
+# Policy: fully static. The script never runs the CLI, reads no local state,
+# and uses no command substitution or eval.
+
+_cursor_agent() {
+  local curcontext="$curcontext" state line context
+  typeset -A opt_args
+
+  # Brace pairs are written inline so they expand at array construction time
+  # (never store a brace spec in a scalar).
+  local global_options=(
+    '(-h --help)'{-h,--help}'[Display help for command]'
+    '(-v --version)'{-v,--version}'[Output the version number]'
+  )
+
+  _arguments -C \
+    $global_options \
+    '1: :_cursor_agent_commands' \
+    '*:: :->args'
+
+  case $state in
+    args)
+      case $words[1] in
+        mcp)  _cursor_agent_mcp ;;
+        help) _cursor_agent_help ;;
+        *)
+          # First word was not a known command (a prompt): nothing more yet.
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_commands() {
+  local -a commands
+  commands=(
+    'help:Display help for command'
+    'mcp:Manage MCP servers'
+  )
+  _describe -t commands 'agent commands' commands
+}
+
+_cursor_agent_mcp() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_help() {
+  _arguments \
+    '1:command:_cursor_agent_commands'
+}
+
+_cursor_agent "$@"
