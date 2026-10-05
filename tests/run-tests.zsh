@@ -18,6 +18,11 @@
 #             closed sets (command rosters, enums, leaf option lists).
 #   contains  every expected line must appear; extras are allowed. Use where
 #             _files or _message hints add unstable noise.
+#   empty     the buffer must offer nothing: no candidates and no message.
+#             The case lists no expected lines (listing any is a parse
+#             error). It also requires the harness's run marker (exit 0), so
+#             a script that failed to load or never ran cannot pass. Without
+#             this mode, a case with no expected lines is a parse error.
 #
 # Candidates are compared as sets: both sides are re-sorted with `LC_ALL=C
 # sort -u`, so a case never fails just because the runner's locale collates
@@ -108,15 +113,20 @@ parse_case() {
     esac
   done < $file
 
-  if [[ $CASE_MODE != exact && $CASE_MODE != contains ]]; then
-    PARSE_ERR="unknown mode: $CASE_MODE (expected 'exact' or 'contains')"
+  if [[ $CASE_MODE != exact && $CASE_MODE != contains && $CASE_MODE != empty ]]; then
+    PARSE_ERR="unknown mode: $CASE_MODE (expected 'exact', 'contains' or 'empty')"
     return 1
   fi
   if [[ -z $CASE_BUFFER ]]; then
     PARSE_ERR="empty buffer"
     return 1
   fi
-  if (( ${#CASE_EXPECTED} == 0 )); then
+  if [[ $CASE_MODE == empty ]]; then
+    if (( ${#CASE_EXPECTED} )); then
+      PARSE_ERR="mode 'empty' takes no expected lines, got ${#CASE_EXPECTED}"
+      return 1
+    fi
+  elif (( ${#CASE_EXPECTED} == 0 )); then
     PARSE_ERR="no expected candidates"
     return 1
   fi
@@ -146,6 +156,8 @@ for case_file in $CASE_FILES; do
   else
     DOUBLE_TAB=0 zsh $HARNESS "$CASE_BUFFER" > $WORK/raw 2>/dev/null
   fi
+  # 0: _cursor-agent ran and returned cleanly; 3: it never ran (see harness).
+  harness_rc=$?
   LC_ALL=C sort -u $WORK/raw > $WORK/actual
   print -rl -- "$CASE_EXPECTED[@]" | LC_ALL=C sort -u > $WORK/expected
 
@@ -155,7 +167,9 @@ for case_file in $CASE_FILES; do
 
   ok=1
   missing=()
-  if [[ $CASE_MODE == exact ]]; then
+  if [[ $CASE_MODE == empty ]]; then
+    (( harness_rc == 0 && ${#actual} == 0 )) || ok=0
+  elif [[ $CASE_MODE == exact ]]; then
     cmp -s $WORK/expected $WORK/actual || ok=0
   else
     for want in $CASE_EXPECTED; do
@@ -173,6 +187,16 @@ for case_file in $CASE_FILES; do
   (( failed++ ))
   print "FAIL $name  (mode: $CASE_MODE)"
   print "  buffer: '$CASE_BUFFER'"
+  if [[ $CASE_MODE == empty ]]; then
+    if (( harness_rc != 0 )); then
+      print "  harness exit $harness_rc: _cursor-agent did not run cleanly (load error, timeout, or buffer not dispatched to it)"
+    fi
+    if (( ${#actual} )); then
+      print "  expected nothing, but the harness offered:"
+      sed 's/^/    /' $WORK/actual
+    fi
+    continue
+  fi
   if (( ${#actual} == 0 )); then
     print "  harness produced NO candidates (script error, or the buffer offers nothing)"
   fi
