@@ -1,0 +1,2 @@
+buffer='agent env deploy --scm-repo-node-id '
+MSG: -e option--scm-repo-node-id-1 SCM repo node ID

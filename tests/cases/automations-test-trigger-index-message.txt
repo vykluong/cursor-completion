@@ -1,0 +1,2 @@
+buffer='agent automations test --trigger-index '
+MSG: -e option--trigger-index-1 index
