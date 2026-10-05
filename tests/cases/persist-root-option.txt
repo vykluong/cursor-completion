@@ -1,0 +1,3 @@
+buffer='agent persist --plan --mo'
+--model
+MSG: -e argument-rest prompt

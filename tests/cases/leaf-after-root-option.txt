@@ -1,0 +1,4 @@
+buffer='agent about --debug -'
+--format
+--help
+-h

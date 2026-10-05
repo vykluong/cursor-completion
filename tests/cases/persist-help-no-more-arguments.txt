@@ -1,0 +1,2 @@
+buffer='agent persist -h '
+MSG: no more arguments

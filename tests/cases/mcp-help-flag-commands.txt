@@ -1,0 +1,6 @@
+buffer='agent mcp -h '
+disable
+enable
+list
+list-tools
+login

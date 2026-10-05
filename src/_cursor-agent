@@ -139,12 +139,15 @@ _cursor_agent() {
     '--warm-request-context[(deprecated) No-op]'
   )
 
-  # The '*::' split below drops the words before the command word; the prompt
-  # branch restores them so options typed before the prompt still count.
+  # -A '-*' stops root option parsing at the command word, so an option after
+  # a leaf command reaches the leaf's own table; the prompt branch re-offers
+  # root options itself. The '*::' split below drops the words before the
+  # command word; the prompt branch restores them so options typed before the
+  # prompt still count.
   local -a all_words=("${words[@]}")
   local -i all_current=$CURRENT
 
-  _arguments -C \
+  _arguments -C -A '-*' \
     $global_options \
     '1: :_cursor_agent_commands' \
     '*:: :->args'
