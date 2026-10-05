@@ -1,0 +1,26 @@
+# Deliberate deviations of src/_cursor-agent from tools/cli-surface.txt,
+# read by tools/check-coverage.zsh.
+#
+# Format: one deviation per line, fields joined by " | ":
+#
+#   <function> | <code> | <entry> | <reason>
+#
+# The first three fields must match a finding of check-coverage.zsh exactly
+# (the function, the code and the entry it prints: `<function> (<path>):
+# <code> <entry>: <detail>`). The reason is required. Blank lines and lines
+# starting with `#` are ignored. A line that matches no finding is reported as
+# `exception-unused` (exit 1), so delete lines once their deviation is gone.
+#
+# Not needed here, because the checker does not flag them:
+#   - Exclusion groups (-f/--force/--yolo, --mode/--plan, --resume/--continue,
+#     --enable-bedrock/--enable-local-bedrock): editorial; the checker does
+#     not compare them with the snapshot's conflicts= attributes, it only
+#     checks that each flag a group names exists in the same function.
+#   - `team` is `conditional` in the snapshot: conditional entries are
+#     compared like any other entry of their tier, so `team` belongs in the
+#     visible `commands` roster.
+#   - `repaint-debug [agentArgs...]` completes free text: a `*:` spec
+#     matches the variadic positional, and free text has no enum to compare.
+
+_cursor_agent | enum-extra | --http-version | no .choices() in the CLI; the values (1.1 2) come from its own description ("1.1 or 2")
+_cursor_agent | enum-extra | --repo-http-version | no .choices() in the CLI; the values (1.1 2) come from its own description ("1.1 or 2")
