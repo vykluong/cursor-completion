@@ -1,6 +1,6 @@
 # Plan: Zsh completion for the Cursor CLI (`agent`)
 
-> **Handoff pointer (2026-10-04):** Steps 1 to 4 are done on `claude/inspiring-ptolemy-9usvnc`, and the full `zsh tests/run-tests.zsh` suite passes (321 cases). Next is step 5 (docs and release). Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed. Open questions for the owner: (1) `tests/run-tests.zsh` rejects a case with no expected candidates, so "offers nothing" cannot be pinned.
+> **Handoff pointer (2026-10-04):** Steps 1 to 4 are done on `claude/inspiring-ptolemy-9usvnc`, and the full `zsh tests/run-tests.zsh` suite passes (325 cases). Next is step 5 (docs and release). Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed.
 
 
 ## Context
@@ -44,7 +44,7 @@ README.md  CLAUDE.md  CHANGELOG.md  LICENSE (MIT)  .github/workflows/ci.yml
 ```
 
 - `git init` on `main`; commit style per the reference (imperative, capitalized subjects).
-- Port `tests/zcomp-runner.zsh` and `tests/run-tests.zsh` from the reference nearly verbatim (zpty harness with `compadd`/`_message` capture, golden files with `exact`/`contains` modes and `# double-tab`). Only the script name, fpath copy, and default buffer prefix change.
+- Port `tests/zcomp-runner.zsh` and `tests/run-tests.zsh` from the reference nearly verbatim (zpty harness with `compadd`/`_message` capture, golden files with `exact`/`contains`/`empty` modes and `# double-tab`). Only the script name, fpath copy, and default buffer prefix change.
 - Port `ci.yml` (syntax job with `zsh -n`, test matrix ubuntu + macos), `LICENSE`, and the CLAUDE.md conventions (hidden-entry provenance rule, inline brace pairs, no local named `path`, `${=c}`, generated snapshot never hand-edited). Prose in American English, no default em dashes.
 
 ### 2. Build the drift tool first: `tools/check-drift.zsh`
