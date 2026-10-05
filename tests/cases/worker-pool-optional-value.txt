@@ -3,5 +3,4 @@ controller
 debug
 help
 MSG: -e option--pool-1 pool name (defaults to default)
-self-test
 start

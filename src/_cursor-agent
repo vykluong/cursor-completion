@@ -147,6 +147,17 @@ _cursor_agent() {
   local -a all_words=("${words[@]}")
   local -i all_current=$CURRENT
 
+  # Commander takes the next non-dash word after an optional-value option as
+  # its value ("agent --resume about" resumes a chat named about), while '::'
+  # would also offer commands or prompt words there. Right after --resume or
+  # -w/--worktree, make that option's value required for this call so only
+  # the value message is offered. global_options is dynamically scoped, so
+  # this also covers the prompt branch and _cursor_agent_persist.
+  local prev=$words[CURRENT-1]
+  if [[ $prev == (--resume|-w|--worktree) && $words[CURRENT] != -* ]]; then
+    global_options[(r)*$prev\[*]=${global_options[(r)*$prev\[*]/\]::/]:}
+  fi
+
   _arguments -C -A '-*' \
     $global_options \
     '1: :_cursor_agent_commands' \
@@ -635,6 +646,12 @@ _cursor_agent_worker() {
     worker_options[(r)--pool\[*]=${worker_options[(r)--pool\[*]%%::*}
   fi
 
+  # Right after a bare --pool, any word but a stop word becomes the pool
+  # name, so offer only the stop words as commands there (not self-test).
+  # _cursor_agent_worker_commands sees pool_stop_words by dynamic scoping.
+  local -i pool_stop_words=0
+  [[ $words[CURRENT-1] == --pool && $words[CURRENT] != -* ]] && pool_stop_words=1
+
   _arguments -C -A '-*' \
     $worker_options \
     '1: :_cursor_agent_worker_commands' \
@@ -668,6 +685,9 @@ _cursor_agent_worker_commands() {
     'self-test:Verify this build can analyze a shell command with its tree-sitter natives'
   )
   _describe -t commands 'worker commands' commands
+  # After a bare --pool, only the stop words (start, controller, debug,
+  # help), which are exactly the visible commands, stay the subcommand.
+  (( ${pool_stop_words:-0} )) && return
   _describe -t hidden-commands 'hidden commands' hidden_commands
 }
 
