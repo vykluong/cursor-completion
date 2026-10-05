@@ -1,0 +1,4 @@
+buffer='agent team list -'
+--format
+--help
+-h

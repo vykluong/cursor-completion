@@ -1,0 +1,8 @@
+buffer='agent worker controller --pool gpu -'
+--help
+--pool
+--repository
+--session-token
+--spawn
+--warm-idle
+-h

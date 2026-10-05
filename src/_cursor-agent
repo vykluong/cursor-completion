@@ -265,15 +265,703 @@ _cursor_agent_commands() {
 }
 
 # --- Command trees ---
-_cursor_agent_mcp() { _message 'mcp subcommand' }
-_cursor_agent_plugin() { _message 'plugin subcommand' }
-_cursor_agent_team() { _message 'team subcommand' }
-_cursor_agent_bedrock() { _message 'bedrock subcommand' }
-_cursor_agent_worker() { _message 'worker subcommand' }
-_cursor_agent_persist() { _message 'persist subcommand' }
-_cursor_agent_sandbox() { _message 'sandbox subcommand' }
-_cursor_agent_repo() { _message 'repo subcommand' }
-_cursor_agent_local_worker() { _message 'local-worker subcommand' }
+# Each level with subcommands has its own _arguments -C dispatcher and roster;
+# a level's builtin "help [command]" completes that level's command names.
+# The dispatchers pass -A '-*' so that options after the subcommand word are
+# left to the leaf (worker and worker controller both define --pool).
+
+# ---------------------------------------------------------------------------
+# mcp
+# ---------------------------------------------------------------------------
+_cursor_agent_mcp() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_mcp_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        disable)    _cursor_agent_mcp_disable ;;
+        enable)     _cursor_agent_mcp_enable ;;
+        list)       _cursor_agent_mcp_list ;;
+        list-tools) _cursor_agent_mcp_list_tools ;;
+        login)      _cursor_agent_mcp_login ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_mcp_commands() {
+  local -a commands
+  commands=(
+    'disable:Disable an MCP server (it will not be loaded or prompted for approval)'
+    'enable:Add an MCP server to the local approved list'
+    'list:List configured MCP servers and their status'
+    'list-tools:List available tools and their argument names for a specific MCP'
+    'login:Authenticate with an MCP server configured in .cursor/mcp.json or ~/.cursor/mcp.json'
+  )
+  _describe -t commands 'mcp commands' commands
+}
+
+_cursor_agent_mcp_disable() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:MCP server identifier (run agent mcp list to see them):'
+}
+
+_cursor_agent_mcp_enable() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:MCP server identifier (run agent mcp list to see them):'
+}
+
+_cursor_agent_mcp_list() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_mcp_list_tools() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:MCP server identifier (run agent mcp list to see them):'
+}
+
+_cursor_agent_mcp_login() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:MCP server identifier (run agent mcp list to see them):'
+}
+
+# ---------------------------------------------------------------------------
+# plugin
+# ---------------------------------------------------------------------------
+_cursor_agent_plugin() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_plugin_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        marketplace) _cursor_agent_plugin_marketplace ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_plugin_commands() {
+  local -a commands
+  commands=(
+    'marketplace:Manage plugin marketplaces'
+  )
+  _describe -t commands 'plugin commands' commands
+}
+
+_cursor_agent_plugin_marketplace() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_plugin_marketplace_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        add)    _cursor_agent_plugin_marketplace_add ;;
+        list)   _cursor_agent_plugin_marketplace_list ;;
+        remove) _cursor_agent_plugin_marketplace_remove ;;
+        update) _cursor_agent_plugin_marketplace_update ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_plugin_marketplace_commands() {
+  local -a commands
+  commands=(
+    'add:Add a plugin marketplace from a git repository URL'
+    'list:List plugin marketplaces visible to this account'
+    'remove:Remove a plugin marketplace by name or git repository URL'
+    'update:Re-index a plugin marketplace from its git repository'
+  )
+  _describe -t commands 'marketplace commands' commands
+}
+
+_cursor_agent_plugin_marketplace_add() {
+  _arguments \
+    '--git-ref[Branch, tag, or commit to index (defaults to the default branch)]:branch, tag, or commit:' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:git repository URL:'
+}
+
+_cursor_agent_plugin_marketplace_list() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_plugin_marketplace_remove() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:marketplace name or git URL (run agent plugin marketplace list to see them):'
+}
+
+_cursor_agent_plugin_marketplace_update() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:marketplace name or git URL (run agent plugin marketplace list to see them):'
+}
+
+# ---------------------------------------------------------------------------
+# team (registered behind a runtime condition but listed in --help; list is
+# the default subcommand)
+# ---------------------------------------------------------------------------
+_cursor_agent_team() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_team_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        help)   _cursor_agent_team_help ;;
+        list)   _cursor_agent_team_list ;;
+        switch) _cursor_agent_team_switch ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_team_commands() {
+  local -a commands
+  commands=(
+    'help:Display help for command'
+    'list:List the teams this account belongs to'
+    'switch:Switch the active team (by id or name, or interactively)'
+  )
+  _describe -t commands 'team commands' commands
+}
+
+# Commander's builtin help: completes the team command names.
+_cursor_agent_team_help() {
+  _arguments \
+    '1:command:_cursor_agent_team_commands'
+}
+
+_cursor_agent_team_list() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_team_switch() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1::team ID or name (run agent team list to see them):'
+}
+
+# ---------------------------------------------------------------------------
+# bedrock
+# ---------------------------------------------------------------------------
+_cursor_agent_bedrock() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_bedrock_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        clear)         _cursor_agent_bedrock_clear ;;
+        configure)     _cursor_agent_bedrock_configure ;;
+        disable)       _cursor_agent_bedrock_disable ;;
+        enable)        _cursor_agent_bedrock_enable ;;
+        help)          _cursor_agent_bedrock_help ;;
+        status)        _cursor_agent_bedrock_status ;;
+        test)          _cursor_agent_bedrock_test ;;
+        use-team-role) _cursor_agent_bedrock_use_team_role ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_bedrock_commands() {
+  local -a commands hidden_commands
+  commands=(
+    'clear:Clear Bedrock credentials from secure storage and disable mode'
+    'configure:Configure AWS Bedrock settings (credentials, region, test model)'
+    'disable:Disable Bedrock mode but keep stored credentials'
+    'enable:Enable Bedrock mode (requires stored credentials)'
+    'help:Display help for command'
+    'status:Show Bedrock configuration and team-role availability'
+    'test:Validate stored Bedrock credentials with the backend'
+  )
+  # Hidden: absent from "agent bedrock --help" unless a runtime condition
+  # holds. Registered as .command(name, {hidden:!<condition>}) in
+  # ./src/cli.ts and verified by the drift tool, which found the command's
+  # own usage line in its --help output.
+  hidden_commands=(
+    'use-team-role:Enable bedrock configured by your team'
+  )
+  _describe -t commands 'bedrock commands' commands
+  _describe -t hidden-commands 'hidden commands' hidden_commands
+}
+
+_cursor_agent_bedrock_clear() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Secret: --access-key and --secret-key complete nothing.
+_cursor_agent_bedrock_configure() {
+  _arguments \
+    '--access-key[AWS Access Key ID]:access key ID (not completed):' \
+    '--from-env[Read credentials from AWS_* environment variables]' \
+    '--region[AWS region (e.g. us-east-1)]:region:' \
+    '--secret-key[AWS Secret Access Key]:secret access key (not completed):' \
+    '--test-model[Bedrock model ID used for validation]:Bedrock model ID:' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_bedrock_disable() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_bedrock_enable() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Commander's builtin help: completes the bedrock command names.
+_cursor_agent_bedrock_help() {
+  _arguments \
+    '1:command:_cursor_agent_bedrock_commands'
+}
+
+_cursor_agent_bedrock_status() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_bedrock_test() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Hidden (conditionally); see _cursor_agent_bedrock_commands.
+_cursor_agent_bedrock_use_team_role() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# ---------------------------------------------------------------------------
+# worker
+# ---------------------------------------------------------------------------
+# The worker options belong to "agent worker" itself and are given before
+# the subcommand. --pool takes an optional value; the CLI rewrites argv
+# before commander so that "--pool <word>" keeps <word> as the pool name
+# unless it is one of start, controller, debug or help.
+_cursor_agent_worker() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  # --label and --labels-file exclude each other: the CLI's own descriptions
+  # say they cannot be combined (checked in the action, not by .conflicts()).
+  local -a worker_options=(
+    '--auth-token-file[Path to a file containing the worker auth token]:token file:_files'
+    "--clone-git-repos[Check out the claimed agent's Git repositories in the worker directory (any-repo pool workers only)]"
+    "--computer-use[Let claimed cloud agents drive this machine's desktop (screenshot, click, type)]"
+    '--connect-workspace[Let Cursor connect to the live workspace of agents this worker runs (Linux only)]'
+    '--data-dir[Base directory for logs, artifacts, and recording data (can also use CURSOR_DATA_DIR env var)]:directory:_directories'
+    '--debug[Print worker debug diagnostics before starting bridge mode]'
+    '--display[Existing X11 display to require for --computer-use (Linux only)]:X11 display:'
+    '(-h --help)'{-h,--help}'[Display help for command]'
+    '--identity-socket[Expose a per-claim OIDC identity socket to claimed agents]'
+    '--idle-release-timeout[Seconds the worker may stay connected while idle before it is released (0 disables)]:seconds:'
+    '(--labels-file)*--label[Add a label to the worker (format: key=value, can be used multiple times)]:key=value:'
+    '(--label)--labels-file[Path to a JSON or TOML file containing labels (can also use CURSOR_WORKER_LABELS_FILE env var)]:labels file:_files'
+    '--management-addr[Listen address for an optional HTTP server with health, readiness, and metrics endpoints]:address (for example :8080):'
+    '--mint-github-token[Receive short-lived GitHub tokens during claimed runs (pool workers only)]'
+    '--name[Custom display name for this worker (can also use CURSOR_WORKER_NAME env var)]:worker name:'
+    '--on-session-end[Add a worker-host sessionEnd command before pool claim teardown]:command:'
+    '--on-session-start[Add a worker-host sessionStart command after a pool claim]:command:'
+    '--pool[Join a team Self-Hosted Pool instead of registering a personal My Machines worker]::pool name (defaults to default):'
+    '--pool-name[Deprecated alias for --pool <name> (can also use CURSOR_WORKER_POOL_NAME env var)]:pool name:'
+    "--share-desktop[Let authorized viewers watch this worker's desktop through Cursor]::mode:(view view_and_control)"
+    '--single-use[Same as --pool (legacy alias)]'
+    '--sync-dashboard-secrets[Receive eligible dashboard Cloud Agent secrets as environment variables (pool workers only)]'
+    '--wait[Wait for another worker using this data directory to stop (no value waits indefinitely)]::seconds:'
+    '*--worker-dir[Workspace root to expose to agents (repeatable)]:directory:_directories'
+
+    # Hidden: absent from "agent worker --help". Registered as
+    # new Option(...).hideHelp() in ./src/cli.ts and verified by the drift
+    # tool's missing-argument probe.
+    '--worker-api-socket[Unix-domain socket path for an optional gRPC API exposing worker metadata and status]:socket path:_files'
+    '--worker-id[Explicit, stable worker id to register with (can also use CURSOR_AGENT_WORKER_ID env var)]:worker ID:'
+  )
+
+  _arguments -C -A '-*' \
+    $worker_options \
+    '1: :_cursor_agent_worker_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        controller) _cursor_agent_worker_controller ;;
+        debug)      _cursor_agent_worker_debug ;;
+        help)       _cursor_agent_worker_help ;;
+        self-test)  _cursor_agent_worker_self_test ;;
+        start)      _cursor_agent_worker_start ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_worker_commands() {
+  local -a commands hidden_commands
+  commands=(
+    'controller:Claim pending pool requests or keep warm workers, running a spawn hook for each'
+    'debug:Run private worker preflight diagnostics for auth, privacy, routing, and visibility'
+    'help:Display help for command'
+    'start:Start the worker and connect to Cursor'
+  )
+  # Hidden: absent from "agent worker --help". Registered as .command(name,
+  # {hidden:!0}) in ./src/cli.ts and verified by the drift tool, which found
+  # the command's own usage line in its --help output.
+  hidden_commands=(
+    'self-test:Verify this build can analyze a shell command with its tree-sitter natives'
+  )
+  _describe -t commands 'worker commands' commands
+  _describe -t hidden-commands 'hidden commands' hidden_commands
+}
+
+# Exclusion groups mirror the .conflicts() calls: --pool and --warm-idle
+# conflict with --all-pools, and --session-token with --warm-idle. --pool is
+# repeatable (one pending-requests list per name).
+_cursor_agent_worker_controller() {
+  _arguments \
+    '(--pool --warm-idle)--all-pools[Omit the pool query param so pending-requests is team-wide (not allowed in warm mode)]' \
+    '(--all-pools)*--pool[Pool to claim from, or in warm mode to keep warm (repeatable)]:pool name:' \
+    '--repository[Filter pending requests by repository URL]:repository URL:' \
+    '(--warm-idle)--session-token[Claim mode only: give the spawn hook a per-claim session token instead of CURSOR_API_KEY]' \
+    '--spawn[Spawn hook to exec after a successful claim or once per missing warm worker (required)]:spawn hook:_files' \
+    '(--all-pools --session-token)--warm-idle[Warm-pool mode: keep this many idle workers connected in each --pool]:count:' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_worker_debug() {
+  _arguments \
+    '--json[Output debug report as JSON]' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Commander's builtin help: completes the worker command names.
+_cursor_agent_worker_help() {
+  _arguments \
+    '1:command:_cursor_agent_worker_commands'
+}
+
+# Hidden; see _cursor_agent_worker_commands.
+_cursor_agent_worker_self_test() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_worker_start() {
+  _arguments \
+    '--verbose[Enable verbose worker startup logs (includes debug)]' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# ---------------------------------------------------------------------------
+# persist
+# ---------------------------------------------------------------------------
+# persist is parsed by hand before commander runs. Only the word right after
+# "persist" can be list, attach or stop (or -h/--help); anything else is
+# forwarded to the root command, so "agent persist [options] [prompt...]"
+# takes the root options and a prompt. global_options is the local array of
+# _cursor_agent, visible here through zsh's dynamic scoping.
+_cursor_agent_persist() {
+  if (( CURRENT == 2 )); then
+    _arguments \
+      $global_options \
+      '1: :_cursor_agent_persist_commands'
+    return
+  fi
+
+  case $words[2] in
+    attach|help|list|stop)
+      # Drop "persist" so the leaf sees its own name as words[1].
+      shift words
+      (( CURRENT-- ))
+      case $words[1] in
+        attach) _cursor_agent_persist_attach ;;
+        help)   _cursor_agent_persist_help ;;
+        list)   _cursor_agent_persist_list ;;
+        stop)   _cursor_agent_persist_stop ;;
+      esac
+      ;;
+    -h|--help)
+      # The hand-rolled parser prints usage and exits; nothing follows.
+      _message 'no more arguments' ;;
+    *)
+      # The first word after persist began the forwarded root argv: keep
+      # offering root options, and accept free-text prompt words.
+      _arguments \
+        $global_options \
+        '*:prompt:' ;;
+  esac
+}
+
+_cursor_agent_persist_commands() {
+  local -a commands
+  commands=(
+    'attach:Attach to a persistent session'
+    'help:Display help for command'
+    'list:List persistent sessions'
+    'stop:Stop a persistent session'
+  )
+  _describe -t commands 'persist commands' commands
+}
+
+# The persist leaves take exactly the words their usage shows. -h/--help is
+# deliberately not offered: the hand-rolled parser reads it as the session
+# name after attach/stop, and as a usage error after list.
+_cursor_agent_persist_attach() {
+  _arguments \
+    '1:persistent session name (run agent persist list to see them):'
+}
+
+# The snapshot lists commander's builtin help here; completes the persist
+# command names.
+_cursor_agent_persist_help() {
+  _arguments \
+    '1:command:_cursor_agent_persist_commands'
+}
+
+_cursor_agent_persist_list() {
+  _message 'no arguments'
+}
+
+_cursor_agent_persist_stop() {
+  _arguments \
+    '1:persistent session name (run agent persist list to see them):'
+}
+
+# ---------------------------------------------------------------------------
+# sandbox (hidden tree: the parent is registered with {hidden:!0}, see the
+# root roster; its subcommands are listed in "agent sandbox --help")
+# ---------------------------------------------------------------------------
+_cursor_agent_sandbox() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_sandbox_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        disable) _cursor_agent_sandbox_disable ;;
+        enable)  _cursor_agent_sandbox_enable ;;
+        help)    _cursor_agent_sandbox_help ;;
+        reset)   _cursor_agent_sandbox_reset ;;
+        run)     _cursor_agent_sandbox_run ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_sandbox_commands() {
+  local -a commands
+  commands=(
+    'disable:Disable sandbox mode and use allowlist mode (default)'
+    'enable:Enable sandbox mode for command execution'
+    'help:Display help for command'
+    'reset:Reset sandbox configuration to defaults'
+    'run:Run a command in a sandbox (defaults to workspace read/write)'
+  )
+  _describe -t commands 'sandbox commands' commands
+}
+
+_cursor_agent_sandbox_disable() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_sandbox_enable() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Commander's builtin help: completes the sandbox command names.
+_cursor_agent_sandbox_help() {
+  _arguments \
+    '1:command:_cursor_agent_sandbox_commands'
+}
+
+_cursor_agent_sandbox_reset() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# allowExcessArguments: <cmd> [args...] is the command line to sandbox.
+_cursor_agent_sandbox_run() {
+  _arguments \
+    '--allow-paths[Comma-separated list of additional read/write paths]:paths:_sequence _files' \
+    '--blocked-patterns[Comma-separated list of patterns (in gitignore format) to block]:patterns:' \
+    '--network[Enable network access in sandbox]' \
+    '--readonly-paths[Comma-separated list of additional read-only paths]:paths:_sequence _files' \
+    '--sandbox[Run with sandbox (workspace_readwrite policy)]' \
+    '--sb-debug[Write sandbox debug logs to a temp folder and print the path]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:command to run:_command_names -e' \
+    '*:command arguments:_files'
+}
+
+# ---------------------------------------------------------------------------
+# repo (hidden tree: the parent is registered with {hidden:!0}, see the root
+# roster)
+# ---------------------------------------------------------------------------
+_cursor_agent_repo() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_repo_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        help)   _cursor_agent_repo_help ;;
+        info)   _cursor_agent_repo_info ;;
+        search) _cursor_agent_repo_search ;;
+        status) _cursor_agent_repo_status ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_repo_commands() {
+  local -a commands hidden_commands
+  commands=(
+    'help:Display help for command'
+    'info:Get repository info'
+    'status:Get repository status'
+  )
+  # Hidden: absent from "agent repo --help". Registered as .command(name,
+  # {hidden:!0}) in ./src/cli.ts and verified by the drift tool, which found
+  # the command's own usage line in its --help output.
+  hidden_commands=(
+    'search:Search repository code using semantic search'
+  )
+  _describe -t commands 'repo commands' commands
+  _describe -t hidden-commands 'hidden commands' hidden_commands
+}
+
+# Commander's builtin help: completes the repo command names.
+_cursor_agent_repo_help() {
+  _arguments \
+    '1:command:_cursor_agent_repo_commands'
+}
+
+_cursor_agent_repo_info() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Hidden; see _cursor_agent_repo_commands.
+_cursor_agent_repo_search() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:search query:'
+}
+
+_cursor_agent_repo_status() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# ---------------------------------------------------------------------------
+# local-worker (hidden tree: the parent is registered with {hidden:!0}, see
+# the root roster; its subcommands are listed in "agent local-worker --help")
+# ---------------------------------------------------------------------------
+_cursor_agent_local_worker() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C -A '-*' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_local_worker_commands' \
+    '*:: :->sub'
+
+  case $state in
+    sub)
+      case $words[1] in
+        help)  _cursor_agent_local_worker_help ;;
+        kill)  _cursor_agent_local_worker_kill ;;
+        ping)  _cursor_agent_local_worker_ping ;;
+        sleep) _cursor_agent_local_worker_sleep ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_local_worker_commands() {
+  local -a commands
+  commands=(
+    'help:Display help for command'
+    'kill:Kill the local worker server'
+    'ping:Ping the local worker server'
+    'sleep:Sleep on the local worker server'
+  )
+  _describe -t commands 'local-worker commands' commands
+}
+
+# Commander's builtin help: completes the local-worker command names.
+_cursor_agent_local_worker_help() {
+  _arguments \
+    '1:command:_cursor_agent_local_worker_commands'
+}
+
+_cursor_agent_local_worker_kill() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_local_worker_ping() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_local_worker_sleep() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
 
 # ---------------------------------------------------------------------------
 # Single-level commands

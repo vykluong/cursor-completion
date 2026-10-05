@@ -1,0 +1,8 @@
+buffer='agent sandbox run --network ls -'
+--allow-paths
+--blocked-patterns
+--help
+--readonly-paths
+--sandbox
+--sb-debug
+-h

@@ -1,0 +1,7 @@
+buffer='agent worker controller --session-token -'
+--all-pools
+--help
+--pool
+--repository
+--spawn
+-h

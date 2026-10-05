@@ -1,0 +1,3 @@
+buffer='agent worker self-test -'
+--help
+-h

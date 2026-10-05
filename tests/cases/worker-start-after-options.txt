@@ -1,0 +1,4 @@
+buffer='agent worker --pool gpu start -'
+--help
+--verbose
+-h

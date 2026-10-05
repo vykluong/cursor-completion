@@ -1,0 +1,6 @@
+buffer='agent worker '
+controller
+debug
+help
+self-test
+start

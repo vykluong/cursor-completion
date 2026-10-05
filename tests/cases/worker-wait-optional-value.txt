@@ -1,0 +1,7 @@
+buffer='agent worker --wait '
+controller
+debug
+help
+MSG: -e option--wait-1 seconds
+self-test
+start

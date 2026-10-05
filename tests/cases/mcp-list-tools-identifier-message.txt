@@ -1,0 +1,2 @@
+buffer='agent mcp list-tools '
+MSG: -e argument-1 MCP server identifier (run agent mcp list to see them)

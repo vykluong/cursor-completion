@@ -1,0 +1,5 @@
+buffer='agent plugin marketplace add -'
+--git-ref
+--help
+-h
+MSG: -e argument-1 git repository URL

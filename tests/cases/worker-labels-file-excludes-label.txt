@@ -1,0 +1,26 @@
+buffer='agent worker --labels-file x.json -'
+--auth-token-file
+--clone-git-repos
+--computer-use
+--connect-workspace
+--data-dir
+--debug
+--display
+--help
+--identity-socket
+--idle-release-timeout
+--management-addr
+--mint-github-token
+--name
+--on-session-end
+--on-session-start
+--pool
+--pool-name
+--share-desktop
+--single-use
+--sync-dashboard-secrets
+--wait
+--worker-api-socket
+--worker-dir
+--worker-id
+-h

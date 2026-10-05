@@ -1,0 +1,2 @@
+buffer='agent repo search '
+MSG: -e argument-1 search query

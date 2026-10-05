@@ -1,0 +1,3 @@
+buffer='agent team switch --format '
+json
+text

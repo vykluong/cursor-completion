@@ -1,0 +1,4 @@
+buffer='agent persist fix --mo'
+--mode
+--model
+MSG: -e argument-rest prompt

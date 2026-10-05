@@ -1,0 +1,8 @@
+buffer='agent bedrock configure -'
+--access-key
+--from-env
+--help
+--region
+--secret-key
+--test-model
+-h

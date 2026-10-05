@@ -1,0 +1,5 @@
+buffer='agent plugin marketplace '
+add
+list
+remove
+update
