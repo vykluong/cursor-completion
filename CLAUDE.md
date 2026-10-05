@@ -35,6 +35,8 @@ The test harness drives a real interactive zsh through zpty. It never invokes th
 - Every command and flag the binary accepts in tiers 1 to 3 is completed, including ones `--help` hides. A hidden or gated entry carries a comment stating its class (hidden or gated) and how that class is verified. Per-entry probe results, dates, and versions live in the generated snapshot `tools/cli-surface.txt`, not in script comments.
 - Keep the target-version header comment in sync with the CLI version the tables were generated against. It is the only place the version appears.
 - Leaf contexts complete leaf options only. Commander also accepts root options after a subcommand, but that is deliberate noise reduction. Before a subcommand, and after a first word that is not a command (the prompt case), root options stay available.
+- Values complete in the space-separated form only (`--mode plan`). Do not declare the `--opt=value` form; the CLI's own hints do not use it.
+- No commands after an optional-value option: commander takes the next word as the value, so after `--resume` or `-w/--worktree` only the value message is offered, and after a bare worker `--pool` only the `--pool` stop words.
 - Naming: helpers are `_cursor_agent_*`. Per-command function names derive mechanically from the command path (`agent plugin marketplace add` is `_cursor_agent_plugin_marketplace_add`).
 - Write `{--a,--b}` brace pairs inline inside the `_arguments` array. Never store a brace spec in a scalar; it will not expand.
 - Every behavior change needs a matching case in `tests/cases/`. Regenerate expectations with `zsh tests/zcomp-runner.zsh '<buffer>'` and review them against `tools/cli-surface.txt`; do not hand-type them.
@@ -42,7 +44,7 @@ The test harness drives a real interactive zsh through zpty. It never invokes th
 
 ## Test case files (tests/cases/*.txt)
 
-- Format is documented at the top of `tests/run-tests.zsh` (`buffer=` line, optional `# mode:` and `# double-tab` lines, set comparison).
+- Format is documented at the top of `tests/run-tests.zsh` (`buffer=` line, optional `# mode:` and `# double-tab` lines, set comparison). Modes are `exact` (default), `contains`, and `empty`. An `empty` case lists no expected lines and passes only if the harness's run marker shows `_cursor-agent` ran cleanly (runner exit 0, not 3), so a load error cannot pass as "offers nothing".
 
 ## Editing the zsh tooling (tests/, tools/)
 
