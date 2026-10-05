@@ -1,0 +1,5 @@
+buffer='agent --dis'
+--disable-auto-update
+--disable-codebase-ref
+--disable-indexing
+--disable-project-configs

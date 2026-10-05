@@ -1,0 +1,6 @@
+buffer='agent s'
+sandbox
+set-channel
+shell-integration
+sonnet
+status

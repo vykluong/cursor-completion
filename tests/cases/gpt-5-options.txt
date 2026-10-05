@@ -1,0 +1,4 @@
+buffer='agent gpt-5 -'
+--help
+-h
+MSG: -e argument-rest initial prompt for the agent

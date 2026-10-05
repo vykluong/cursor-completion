@@ -1,0 +1,2 @@
+buffer='agent --model '
+MSG: -e option--model-1 model name (run agent --list-models to see them)

@@ -1,0 +1,3 @@
+buffer='agent fix the bug --mode '
+ask
+plan

@@ -2,23 +2,141 @@
 
 # ZSH completion script for the Cursor CLI (agent / cursor-agent)
 # Target: Cursor CLI 2026.10.01-e373342
+# Command/option tables written from the generated snapshot
+# tools/cli-surface.txt (mined from the bundle and probed against the
+# installed CLI), captured 2026-10-04. Descriptions are the CLI's own.
 #
-# SCAFFOLD STUB: this file only proves the test harness works end to end. It
-# covers a tiny handful of visible entries and will be replaced in plan step 3
-# by a script written from the generated snapshot (tools/cli-surface.txt).
+# Policy: fully static. The script never runs the CLI, reads no local state
+# (no .cursor/mcp.json, chat stores, or config), uses no command substitution
+# or eval, and forks no subprocesses. Runtime-only values (models, teams, MCP
+# identifiers, chat IDs, workspaces, persist sessions, marketplaces) get a
+# descriptive message and no candidates. Secret-bearing options complete
+# nothing.
 #
-# Policy: fully static. The script never runs the CLI, reads no local state,
-# and uses no command substitution or eval.
+# Scope, in four tiers:
+#   1. Visible in --help: completed.
+#   2. Hidden but registered (.hideHelp(), {hidden:!0}): completed, marked
+#      with a comment. Hidden entries were confirmed by the drift tool's probes
+#      (own usage line for commands; missing-argument or trailing-bogus-flag
+#      probe for options); per-entry results live in tools/cli-surface.txt.
+#   3. Feature-gated (Statsig, account-dependent): completed in a labelled
+#      block and the gated-commands tag. Known from static mining only.
+#   4. Dev-only, compiled out (dev, dev-login, --ian-dev, ...): excluded,
+#      since the binary cannot execute it.
+#
+# Leaf contexts complete leaf options only. Commander also accepts root
+# options after a subcommand, but offering the whole root table under every
+# leaf is noise; this is deliberate. Before a subcommand, and after a first
+# word that is not a command (the prompt case), root options stay available.
 
 _cursor_agent() {
   local curcontext="$curcontext" state line context
   typeset -A opt_args
 
-  # Brace pairs are written inline so they expand at array construction time
-  # (never store a brace spec in a scalar).
+  # Global options available to the top-level command.
+  # Repeatable options carry a leading '*'; enum values are inline; optional
+  # values use '::'; brace pairs are written inline so they expand at array
+  # construction time (never store a brace spec in a scalar).
+  #
+  # Layout: the options "agent --help" documents come first, alphabetically,
+  # then three labelled hidden groups (user-facing, internal/endpoint/dev,
+  # deprecated). _arguments has no per-option tags, so the grouping is
+  # documentation only.
   local global_options=(
+    '*--add-dir[Add an additional workspace root directory]:directory:_directories'
+    # Secret: completes nothing.
+    '--api-key[API key for authentication (can also use CURSOR_API_KEY env var)]:API key (not completed):'
+    '--approve-mcps[Automatically approve all MCP servers]'
+    '--auto-review[Use Auto-review (Smart Auto): a server classifier auto-runs safe tool calls]'
+    '(--resume --continue)--continue[Continue previous session]'
+    '(-e --endpoint)'{-e,--endpoint}'[Target API endpoint URL (can also use CURSOR_API_ENDPOINT env var)]:url:'
+    '(-f --force --yolo)'{-f,--force}'[Force allow commands unless explicitly denied]'
     '(-h --help)'{-h,--help}'[Display help for command]'
+    '*'{-H,--header}"[Add custom header to agent requests (format: 'Name: Value')]:header:"
+    '--list-models[List available models and exit]'
+    '(--mode --plan)--mode[Start in the given execution mode]:mode:(plan ask)'
+    '--model[Model to use]:model name (run agent --list-models to see them):'
+    '--output-format[Output format (only works with --print)]:format:(text json stream-json)'
+    '(--mode --plan)--plan[Start in plan mode (shorthand for --mode=plan)]'
+    '*--plugin-dir[Load a local plugin directory]:directory:_directories'
+    '(-p --print)'{-p,--print}'[Print responses to console (for scripts or non-interactive use)]'
+    '(--resume --continue)--resume[Select a session to resume]::chat ID:'
+    '--sandbox[Explicitly enable or disable sandbox mode (overrides config)]:mode:(enabled disabled)'
+    '--skip-worktree-setup[Skip running worktree setup scripts from .cursor/worktrees.json]'
+    '--stream-partial-output[Stream partial output as individual text deltas (only with --print and stream-json)]'
+    '--trust[Trust the current workspace without prompting]'
     '(-v --version)'{-v,--version}'[Output the version number]'
+    '--workspace[Workspace directory or saved workspace name to use]:workspace directory or saved name:_directories'
+    '(-w --worktree)'{-w,--worktree}'[Start in an isolated git worktree (name generated if omitted)]::worktree name:'
+    '--worktree-base[Branch or ref to base the new worktree on (default: current HEAD)]:branch or ref:'
+    '(-f --force --yolo)--yolo[Alias for --force (Run Everything)]'
+
+    # -----------------------------------------------------------------------
+    # Hidden, user-facing. Absent from "agent --help": registered as
+    # new Option(...).hideHelp() in ./src/cli.ts and verified by the drift
+    # tool's option probes (value-taking: missing-argument probe; boolean:
+    # trailing-bogus-flag probe). --authless, --disable-project-configs and
+    # --enable-bedrock/--enable-local-bedrock are also pre-scanned from raw
+    # argv before commander runs.
+    # -----------------------------------------------------------------------
+    # Secret: completes nothing.
+    '--auth-token[Auth token to use directly (can also use CURSOR_AUTH_TOKEN env var)]:auth token (not completed):'
+    '--authless[Run agent-cli-local without Cursor auth or backend services]'
+    '--background-shell-timeout[Maximum seconds to wait for background shells after the final turn (only with --print)]:seconds:'
+    '--base-url[Provider base URL for agent-cli-local (OpenAI-compatible or Anthropic Messages)]:url:'
+    '--conversation-history-file[Import prior conversation history from the given file]:file:_files'
+    '--debug[Enable debug mode with local log server]'
+    '--disable-auto-update[Disable auto-updates]'
+    '--disable-codebase-ref[Disable the codebase reference used for semantic search and LSP-backed read_lints]'
+    '--disable-indexing[Disables codebase synchronization]'
+    '--disable-project-configs[Ignore .cursor/cli.json files in the current project]'
+    '(--enable-bedrock --enable-local-bedrock)--enable-bedrock[Use AWS Bedrock directly for agent-cli-local requests]'
+    '(--enable-bedrock --enable-local-bedrock)--enable-local-bedrock[Alias for --enable-bedrock]'
+    '(-k --insecure)'{-k,--insecure}'[Allow insecure HTTPS connections]'
+    # Secret: completes nothing.
+    '--local-agent-api-key[Provider API key for agent-cli-local endpoints]:API key (not completed):'
+    '--min-version[Minimum CLI version required (SemVer); exit if older]:version:'
+    '--new-session-id[Create a new session with a caller-provided ID]:uuid:'
+    '--printenv[Capture environment snapshot after each terminal command (only with --print)]'
+    '--show-thinking[Include model thinking blocks in the final JSON result (only with --print and json)]'
+    '--single-turn[Finish after the initial user turn and delegated subagents]'
+    '--stderr[Write logs to stderr]'
+
+    # -----------------------------------------------------------------------
+    # Hidden, internal/endpoint/dev. Same registration and verification as
+    # the group above (--statsig-overrides is also pre-scanned from raw argv).
+    # These serve internal workloads, endpoint overrides and backend debugging
+    # rather than everyday use. --http-version and --repo-http-version have no
+    # .choices(); their enum comes from the CLI's own description ("1.1 or 2").
+    # -----------------------------------------------------------------------
+    '--agent-endpoint[Agent endpoint URL (defaults to the API endpoint URL)]:url:'
+    '*--allowed-tools[Allow only these proto ToolCall tools (internal only; comma-separated)]:tool:'
+    '--computer-use-coords[Set computer-use coordinates to pixels or percent]:mode:(pixels percent)'
+    '--conversation-group-id[Set a custom conversation group ID for request prioritization]:id:'
+    '--data-dir[Set the Cursor data directory used for project metadata (internal only)]:directory:_directories'
+    '--dev-raw-model-slug[Pass through a raw dev model slug for backend debugging]:slug:'
+    '--endless-retries[Retry all retriable errors indefinitely]'
+    '*--exclude-tools[Exclude proto ToolCall tools from this session (internal only; comma-separated)]:tool:'
+    '--exclude-workspace-context[Strip all workspace-sourced context (rules, skills, transcripts, notes)]'
+    '--harness[Apply an internal harness override to the session]:harness:'
+    '--http-version[HTTP version to use]:version:(1.1 2)'
+    '*--image[Attach image(s) to a headless prompt (internal only)]:image file:_files'
+    '--repo-endpoint[Repository API endpoint URL (defaults to https://repo42.cursor.sh)]:url:'
+    '--repo-http-version[HTTP version to use for the repository endpoint]:version:(1.1 2)'
+    '--repo-insecure[Allow insecure HTTPS connections to the repository endpoint]'
+    '--retry-all-inference-errors[Retry otherwise non-retriable inference-request errors]'
+    '--statsig-overrides[Dev-only Statsig overrides JSON payload]:json:'
+    '--system-prompt[Replace system prompt with contents of file]:file:_files'
+    '--website-url[Website URL for browser login (can also use CURSOR_WEBSITE_URL env var)]:url:'
+
+    # -----------------------------------------------------------------------
+    # Hidden, deprecated. Same registration and verification as above; the
+    # CLI describes all three as deprecated (--warm-request-context is a
+    # no-op).
+    # -----------------------------------------------------------------------
+    '(-b --background)'{-b,--background}'[(deprecated) Run in the background]'
+    '(-c --cloud)'{-c,--cloud}'[(deprecated) Run as a cloud agent]'
+    '--warm-request-context[(deprecated) No-op]'
   )
 
   _arguments -C \
@@ -29,10 +147,54 @@ _cursor_agent() {
   case $state in
     args)
       case $words[1] in
-        mcp)  _cursor_agent_mcp ;;
-        help) _cursor_agent_help ;;
+        about)                       _cursor_agent_about ;;
+        agent)                       _cursor_agent_agent ;;
+        bedrock)                     _cursor_agent_bedrock ;;
+        create-chat)                 _cursor_agent_create_chat ;;
+        generate-rule|rule)          _cursor_agent_generate_rule ;;
+        help)                        _cursor_agent_help ;;
+        install-shell-integration)   _cursor_agent_install_shell_integration ;;
+        login)                       _cursor_agent_login ;;
+        logout)                      _cursor_agent_logout ;;
+        ls)                          _cursor_agent_ls ;;
+        mcp)                         _cursor_agent_mcp ;;
+        models)                      _cursor_agent_models ;;
+        persist)                     _cursor_agent_persist ;;
+        plugin)                      _cursor_agent_plugin ;;
+        resume)                      _cursor_agent_resume ;;
+        status|whoami)               _cursor_agent_status ;;
+        team)                        _cursor_agent_team ;;
+        uninstall-shell-integration) _cursor_agent_uninstall_shell_integration ;;
+        update)                      _cursor_agent_update ;;
+        worker)                      _cursor_agent_worker ;;
+        # Hidden commands.
+        acp)                         _cursor_agent_acp ;;
+        cleanup-install-versions)    _cursor_agent_cleanup_install_versions ;;
+        get-channel)                 _cursor_agent_get_channel ;;
+        gpt-5)                       _cursor_agent_gpt_5 ;;
+        gpt5)                        _cursor_agent_gpt5 ;;
+        install)                     _cursor_agent_install ;;
+        local-worker)                _cursor_agent_local_worker ;;
+        opus)                        _cursor_agent_opus ;;
+        record)                      _cursor_agent_record ;;
+        repaint-debug)               _cursor_agent_repaint_debug ;;
+        repo)                        _cursor_agent_repo ;;
+        sandbox)                     _cursor_agent_sandbox ;;
+        set-channel)                 _cursor_agent_set_channel ;;
+        shell-integration)           _cursor_agent_shell_integration ;;
+        sonnet)                      _cursor_agent_sonnet ;;
+        upgrade)                     _cursor_agent_upgrade ;;
+        worker-server)               _cursor_agent_worker_server ;;
+        # Gated (tier 3): gate-dependent, known from static mining only.
+        automations)                 _cursor_agent_automations ;;
+        cloud)                       _cursor_agent_cloud ;;
+        env)                         _cursor_agent_env ;;
         *)
-          # First word was not a known command (a prompt): nothing more yet.
+          # The first word was not a command, so it began a prompt: keep
+          # offering root options, and accept more free-text prompt words.
+          _arguments \
+            $global_options \
+            '*:prompt:'
           ;;
       esac
       ;;
@@ -40,22 +202,264 @@ _cursor_agent() {
 }
 
 _cursor_agent_commands() {
-  local -a commands
+  local -a commands hidden_commands gated_commands
   commands=(
+    'about:Display version, system, and account information'
+    'agent:Start the Cursor Agent'
+    'bedrock:Configure AWS Bedrock usage for CLI'
+    'create-chat:Create a new empty chat and return its ID'
+    'generate-rule:Generate a new Cursor rule with interactive prompts'
     'help:Display help for command'
+    'install-shell-integration:Install shell integration to ~/.zshrc'
+    'login:Authenticate with Cursor'
+    'logout:Sign out and clear stored authentication'
+    'ls:Resume a chat session'
     'mcp:Manage MCP servers'
+    'models:List available models for this account'
+    'persist:Start or manage a session that survives terminal disconnects'
+    'plugin:Manage plugins and plugin marketplaces'
+    'resume:Resume the latest chat session'
+    'rule:Generate a new Cursor rule with interactive prompts (alias)'
+    'status:View authentication status'
+    # team is registered behind a runtime condition but listed in --help.
+    'team:View or switch the active team for this account'
+    'uninstall-shell-integration:Remove shell integration from ~/.zshrc'
+    'update:Update Cursor Agent to the latest version'
+    'whoami:View authentication status (alias)'
+    'worker:Run a self-hosted Cloud Agent worker on this machine'
+  )
+  # Hidden: absent from "agent --help". Registered as .command(name,
+  # {hidden:!0}) in ./src/cli.ts and verified by the drift tool, which found
+  # each command's own usage line in its --help output. The model shortcuts
+  # opus, sonnet, gpt5 and gpt-5 are registered the same way.
+  hidden_commands=(
+    'acp:Start the Cursor Agent as an ACP (Agent Client Protocol) server'
+    'cleanup-install-versions:Remove stale Cursor Agent install versions'
+    'get-channel:Get the configured channel for the Cursor Agent'
+    'gpt-5:Start the Cursor Agent with the GPT-5 model'
+    'gpt5:Start the Cursor Agent with the GPT-5 model'
+    'install:Install Cursor Agent with specified version and URL prefix'
+    'local-worker:Manage local worker server'
+    'opus:Start the Cursor Agent with the Opus model'
+    'record:Run a shell under terminal capture (used by shell integration)'
+    'repaint-debug:Launch agent-cli in a PTY with a browser repaint visualizer'
+    'repo:Manage repository'
+    'sandbox:Sandbox configuration and execution commands'
+    'set-channel:Set the channel for the Cursor Agent'
+    'shell-integration:Print the shell integration script for a shell'
+    'sonnet:Start the Cursor Agent with the Sonnet model'
+    'upgrade:Update Cursor Agent to the latest version (alias for update)'
+    'worker-server:Run a worker server'
+  )
+  # Gated (tier 3): registered only when a Statsig gate is on for the
+  # account, so they are gate-dependent and known from static mining only
+  # (not registered in the drift tool's isolated runs).
+  gated_commands=(
+    'automations:Validate and deploy declarative automation YAML files'
+    'cloud:Manage cloud agents (list, get, transcript)'
+    'env:Manage cloud-agent environments (list, get, deploy, publish, delete)'
   )
   _describe -t commands 'agent commands' commands
+  _describe -t hidden-commands 'hidden commands' hidden_commands
+  _describe -t gated-commands 'gated commands' gated_commands
 }
 
-_cursor_agent_mcp() {
+# --- Command trees ---
+_cursor_agent_mcp() { _message 'mcp subcommand' }
+_cursor_agent_plugin() { _message 'plugin subcommand' }
+_cursor_agent_team() { _message 'team subcommand' }
+_cursor_agent_bedrock() { _message 'bedrock subcommand' }
+_cursor_agent_worker() { _message 'worker subcommand' }
+_cursor_agent_persist() { _message 'persist subcommand' }
+_cursor_agent_sandbox() { _message 'sandbox subcommand' }
+_cursor_agent_repo() { _message 'repo subcommand' }
+_cursor_agent_local_worker() { _message 'local-worker subcommand' }
+
+# ---------------------------------------------------------------------------
+# Single-level commands
+# ---------------------------------------------------------------------------
+_cursor_agent_about() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_agent() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '*:initial prompt for the agent:'
+}
+
+_cursor_agent_create_chat() {
   _arguments \
     '(-h --help)'{-h,--help}'[Display help for command]'
 }
 
+# Also dispatched for the alias 'rule'.
+_cursor_agent_generate_rule() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Commander's builtin help: completes the root command names.
 _cursor_agent_help() {
   _arguments \
     '1:command:_cursor_agent_commands'
 }
+
+_cursor_agent_install_shell_integration() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_login() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_logout() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_ls() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_models() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_resume() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Also dispatched for the alias 'whoami'.
+_cursor_agent_status() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_uninstall_shell_integration() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_update() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# ---------------------------------------------------------------------------
+# Hidden single-level commands. Each is registered with {hidden:!0} and was
+# verified by the drift tool through its own usage line in --help output.
+# ---------------------------------------------------------------------------
+_cursor_agent_acp() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_cleanup_install_versions() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:current version:'
+}
+
+_cursor_agent_get_channel() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# Model shortcut: agent gpt-5 [prompt...].
+_cursor_agent_gpt_5() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '*:initial prompt for the agent:'
+}
+
+# Model shortcut: agent gpt5 [prompt...].
+_cursor_agent_gpt5() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '*:initial prompt for the agent:'
+}
+
+_cursor_agent_install() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:version:' \
+    '2:URL prefix:'
+}
+
+# Model shortcut: agent opus [prompt...].
+_cursor_agent_opus() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '*:initial prompt for the agent:'
+}
+
+_cursor_agent_record() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# allowUnknownOption: the trailing words are passed to agent-cli verbatim.
+_cursor_agent_repaint_debug() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '*:agent arguments:'
+}
+
+# The channel enum comes from the CLI's config schema, not commander.
+_cursor_agent_set_channel() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:channel:(lab prod prod-stable-internal static)'
+}
+
+# The shell enum comes from the command's own validator, not commander.
+_cursor_agent_shell_integration() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:shell:(zsh)'
+}
+
+# Model shortcut: agent sonnet [prompt...].
+_cursor_agent_sonnet() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '*:initial prompt for the agent:'
+}
+
+_cursor_agent_upgrade() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_worker_server() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+# ===========================================================================
+# Gated (tier 3). Everything below is gate-dependent (Statsig, per account)
+# and known from static mining only: the commands are not registered in the
+# drift tool's isolated runs, so nothing here was probed. To drop tier 3,
+# delete this block, the gated_commands roster in _cursor_agent_commands, and
+# the three gated dispatch lines in _cursor_agent.
+# ===========================================================================
+
+# --- Gated command trees ---
+_cursor_agent_automations() { _message 'automations subcommand' }
+_cursor_agent_cloud() { _message 'cloud subcommand' }
+_cursor_agent_env() { _message 'env subcommand' }
+
+# ===========================================================================
+# End of gated (tier 3) block.
+# ===========================================================================
 
 _cursor_agent "$@"

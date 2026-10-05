@@ -1,0 +1,2 @@
+buffer='agent shell-integration '
+zsh

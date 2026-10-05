@@ -1,0 +1,5 @@
+buffer='agent set-channel '
+lab
+prod
+prod-stable-internal
+static

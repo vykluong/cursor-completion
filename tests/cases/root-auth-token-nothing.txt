@@ -1,0 +1,2 @@
+buffer='agent --auth-token '
+MSG: -e option--auth-token-1 auth token (not completed)
