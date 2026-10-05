@@ -1,0 +1,3 @@
+buffer='agent worker s'
+self-test
+start
