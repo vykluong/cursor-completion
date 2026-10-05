@@ -23,6 +23,10 @@
 # sort -u`, so a case never fails just because the runner's locale collates
 # differently from the machine the goldens were generated on.
 #
+# Two preflights run before any case, subset runs included: `zsh -n` on the
+# script, and tools/check-coverage.zsh (the script must agree with
+# tools/cli-surface.txt).
+#
 # Only the static script is exercised; neither `agent` nor `cursor-agent` is ever invoked.
 # Exits 0 when every case passes, 1 otherwise.
 
@@ -33,11 +37,13 @@ REPO_DIR=${TESTS_DIR:h}
 HARNESS=$TESTS_DIR/zcomp-runner.zsh
 CASES_DIR=$TESTS_DIR/cases
 SCRIPT=$REPO_DIR/src/_cursor-agent
+COVERAGE=$REPO_DIR/tools/check-coverage.zsh
 PATTERN=${1-*}
 
 [[ -r $HARNESS ]]    || { print -u2 "run-tests: missing harness: $HARNESS"; exit 1 }
 [[ -d $CASES_DIR ]]  || { print -u2 "run-tests: missing cases dir: $CASES_DIR"; exit 1 }
 [[ -r $SCRIPT ]]     || { print -u2 "run-tests: missing script: $SCRIPT"; exit 1 }
+[[ -r $COVERAGE ]]   || { print -u2 "run-tests: missing coverage checker: $COVERAGE"; exit 1 }
 
 WORK=$(mktemp -d) || exit 1
 trap 'rm -rf $WORK' EXIT INT TERM
@@ -45,6 +51,13 @@ trap 'rm -rf $WORK' EXIT INT TERM
 # --- preflight: a syntax error would make every case fail with empty output --
 if ! zsh -n $SCRIPT; then
   print -u2 "FAIL preflight: 'zsh -n src/_cursor-agent' reported a syntax error"
+  exit 1
+fi
+
+# --- preflight: the script must agree with the CLI snapshot -----------------
+# Runs for subset runs too: a coverage gap is a defect whatever cases run.
+if ! zsh $COVERAGE -q; then
+  print -u2 "FAIL preflight: 'zsh tools/check-coverage.zsh' failed (exit 1: coverage gaps, exit 2: checker error; run it for details)"
   exit 1
 fi
 

@@ -20,8 +20,7 @@ jobs:
       - name: Check src/_cursor-agent
         run: zsh -n src/_cursor-agent
       - name: Check zsh tooling (tests/*.zsh, tools/*.zsh)
-        # The (N) qualifier makes a glob with no matches expand to nothing,
-        # so the step passes while tools/ does not exist yet.
+        # Includes tools/check-coverage.zsh and tools/check-drift.zsh.
         shell: zsh {0}
         run: |
           for f in tests/*.zsh(N) tools/*.zsh(N); do
@@ -43,4 +42,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y zsh
       - name: Run completion test suite
+        # The suite's preflights run `zsh -n src/_cursor-agent` and
+        # tools/check-coverage.zsh (script against tools/cli-surface.txt), so
+        # the coverage check is not repeated as a separate step.
         run: zsh tests/run-tests.zsh

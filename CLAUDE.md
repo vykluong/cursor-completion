@@ -12,17 +12,12 @@ zsh tests/run-tests.zsh 'mcp-*'      # subset, glob on case name
 zsh tests/zcomp-runner.zsh 'agent mcp '   # print candidates for one buffer
 DOUBLE_TAB=1 zsh tests/zcomp-runner.zsh 'agent '   # simulate a second TAB
 zsh -n src/_cursor-agent             # syntax check (CI gate; the suite also runs it as preflight)
+zsh tools/check-coverage.zsh         # compare src/_cursor-agent with the snapshot, both directions (no binary needed; the suite also runs it as preflight)
 zsh tools/check-drift.zsh            # diff installed CLI against tools/cli-surface.txt (runs `agent`; exit 1 drift, 2 tool or miner failure)
 zsh tools/check-drift.zsh snapshot   # accept the new CLI surface
 zsh tools/check-drift.zsh dump --static   # mined records only; executes nothing
 zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>   # compare two installed versions, statically
 zsh tools/check-drift.zsh --help     # modes, flags (--version-dir, --static, --full), exit codes
-```
-
-Planned, not yet written:
-
-```bash
-zsh tools/check-coverage.zsh         # compare src/_cursor-agent with the snapshot, both directions (no binary needed)
 ```
 
 The test harness drives a real interactive zsh through zpty. It never invokes the `agent` binary; only `tools/check-drift.zsh` does.
@@ -54,6 +49,7 @@ The test harness drives a real interactive zsh through zpty. It never invokes th
 - Unquoted `$c` does not word-split in zsh. Use `${=c}` when a variable holds a multi-word command path, or `agent "mcp list" --help` is a single unknown word.
 - Never declare a local named `path`; zsh ties it to `PATH` and wipes command lookup for the whole dynamic scope.
 - `tools/cli-surface.txt` is generated; never hand-edit it. When the CLI surface changes, regenerate it with `zsh tools/check-drift.zsh snapshot` and commit the result in the same change.
+- `tools/coverage-exceptions.txt` lists deliberate deviations, one per line: `<function> | <code> | <entry> | <reason>`; the reason is required, and a line matching no finding is itself a finding (`exception-unused`), so delete stale lines.
 - The local `grep` may be ugrep, which fails on the bundle's long lines. Mine `index.js` with perl or `/usr/bin/grep`.
 
 ## Hazards of executing the CLI
@@ -70,7 +66,7 @@ Only `tools/check-drift.zsh` may run `agent`, and CI never does.
 
 ## Updating for a new CLI release
 
-`tools/check-coverage.zsh` (step 4) is still planned; the other steps work today. To preview an update before switching, run `zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>`.
+To preview an update before switching, run `zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>`.
 
 1. `agent update`.
 2. `zsh tools/check-drift.zsh`. If it exits 2 ("miner needs attention"), fix the miner first.
