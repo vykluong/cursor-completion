@@ -1,0 +1,4 @@
+buffer='agent --data-dir /usr/'
+# mode: contains
+bin
+share

@@ -1,0 +1,4 @@
+buffer='agent --workspace /usr/'
+# mode: contains
+bin
+share

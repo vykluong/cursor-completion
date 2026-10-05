@@ -1,5 +1,4 @@
-buffer='agent fix the bug --'
-# mode: contains
+buffer='agent fix the --'
 --add-dir
 --agent-endpoint
 --allowed-tools

@@ -1,0 +1,5 @@
+buffer='agent --continue --re'
+--repo-endpoint
+--repo-http-version
+--repo-insecure
+--retry-all-inference-errors

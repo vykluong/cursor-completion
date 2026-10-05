@@ -1,0 +1,2 @@
+buffer='agent --harness '
+MSG: -e option--harness-1 harness

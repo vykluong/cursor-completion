@@ -1,0 +1,2 @@
+buffer='agent fix the '
+MSG: -e argument-rest prompt

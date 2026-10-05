@@ -1,0 +1,2 @@
+buffer='agent --exclude-tools '
+MSG: -e option--exclude-tools-1 tool

@@ -1,0 +1,2 @@
+buffer='agent --min-version '
+MSG: -e option--min-version-1 version

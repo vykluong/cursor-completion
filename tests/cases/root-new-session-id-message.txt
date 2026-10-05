@@ -1,0 +1,2 @@
+buffer='agent --new-session-id '
+MSG: -e option--new-session-id-1 uuid

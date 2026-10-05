@@ -1,0 +1,2 @@
+buffer='agent --allowed-tools '
+MSG: -e option--allowed-tools-1 tool

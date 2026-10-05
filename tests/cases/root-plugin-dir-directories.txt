@@ -1,0 +1,4 @@
+buffer='agent --plugin-dir /usr/'
+# mode: contains
+bin
+share

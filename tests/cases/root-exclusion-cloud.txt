@@ -1,0 +1,5 @@
+buffer='agent -c --c'
+--computer-use-coords
+--continue
+--conversation-group-id
+--conversation-history-file

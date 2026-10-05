@@ -1,0 +1,2 @@
+buffer='agent --background-shell-timeout '
+MSG: -e option--background-shell-timeout-1 seconds

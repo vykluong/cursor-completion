@@ -1,0 +1,2 @@
+buffer='agent --mode ask --pl'
+--plugin-dir

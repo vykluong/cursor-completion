@@ -1,0 +1,2 @@
+buffer='agent -H '
+MSG: -e option-H-1 header
