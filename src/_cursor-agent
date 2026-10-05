@@ -139,6 +139,11 @@ _cursor_agent() {
     '--warm-request-context[(deprecated) No-op]'
   )
 
+  # The '*::' split below drops the words before the command word; the prompt
+  # branch restores them so options typed before the prompt still count.
+  local -a all_words=("${words[@]}")
+  local -i all_current=$CURRENT
+
   _arguments -C \
     $global_options \
     '1: :_cursor_agent_commands' \
@@ -192,6 +197,7 @@ _cursor_agent() {
         *)
           # The first word was not a command, so it began a prompt: keep
           # offering root options, and accept more free-text prompt words.
+          words=("${all_words[@]}") CURRENT=$all_current
           _arguments \
             $global_options \
             '*:prompt:'
