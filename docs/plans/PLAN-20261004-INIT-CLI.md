@@ -1,6 +1,6 @@
 # Plan: Zsh completion for the Cursor CLI (`agent`)
 
-> **Handoff pointer (2026-10-04):** Steps 1 to 4 are done on `claude/inspiring-ptolemy-9usvnc`, and the full `zsh tests/run-tests.zsh` suite passes (325 cases). Next is step 5 (docs and release). Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed.
+> **Handoff pointer (2026-10-04):** Steps 1 to 4 are done on `claude/inspiring-ptolemy-9usvnc`, and the full `zsh tests/run-tests.zsh` suite passes (325 cases). Step 5 is in progress: the CHANGELOG release section and release process are written; the README rewrite, the CLAUDE.md audit, and the `cli-2026.10.01-e373342` tag remain. Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed.
 
 
 ## Context
