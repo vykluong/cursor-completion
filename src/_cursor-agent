@@ -28,6 +28,8 @@
 # options after a subcommand, but offering the whole root table under every
 # leaf is noise; this is deliberate. Before a subcommand, and after a first
 # word that is not a command (the prompt case), root options stay available.
+# Values complete in the space-separated form only (--mode plan); the
+# --opt=value form is deliberately not declared, as in the CLI's own hints.
 
 _cursor_agent() {
   local curcontext="$curcontext" state line context

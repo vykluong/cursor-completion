@@ -1,6 +1,6 @@
 # Plan: Zsh completion for the Cursor CLI (`agent`)
 
-> **Handoff pointer (2026-10-04):** Steps 1 to 4 are done on `claude/inspiring-ptolemy-9usvnc`, and the full `zsh tests/run-tests.zsh` suite passes (307 cases). Next is step 5 (docs and release). Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed. Open questions for the owner: (1) No spec declares the `=` form, so `agent --mode=` completes nothing although commander accepts `--mode=plan`. (2) After optional-value options (`agent --resume `, `agent -w `) the command roster is offered, although commander would take the next word as the value. (3) `tests/run-tests.zsh` rejects a case with no expected candidates, so "offers nothing" cannot be pinned.
+> **Handoff pointer (2026-10-04):** Steps 1 to 4 are done on `claude/inspiring-ptolemy-9usvnc`, and the full `zsh tests/run-tests.zsh` suite passes (321 cases). Next is step 5 (docs and release). Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed. Open questions for the owner: (1) `tests/run-tests.zsh` rejects a case with no expected candidates, so "offers nothing" cannot be pinned.
 
 
 ## Context
@@ -28,6 +28,8 @@ The target directory `/Users/vyluong/Development/cursor/custom/cursor-completion
 - **Scope**: tiers 1 to 3 are completed; tier 4 is excluded because the binary cannot execute it. Tier 3 goes in its own clearly labelled block and `_describe` tag (`gated-commands`), with comments stating it is gate-dependent and statically mined only, so it is removable in one edit.
 - **Fully static**: the script never runs `agent`, never reads `.cursor/mcp.json`, chat stores, or any other local state, uses no `eval`, and forks no subprocesses. Runtime-only values get a descriptive message and no candidates (`--model` hints at `agent --list-models`). Secret-bearing options (`--api-key`, `--auth-token`, `--local-agent-api-key`, `bedrock configure --access-key/--secret-key`) complete nothing.
 - **Leaf contexts complete leaf options only.** Commander would also accept root options after a subcommand, but offering 70 root flags under `agent mcp list` is noise; this is recorded as a deliberate choice in a comment. Before a subcommand, and after a first word that is not a command (the prompt case), root options stay available.
+- **Space-separated values only**: values are completed in the space-separated form only (`--mode plan`). The `--opt=value` form is deliberately not declared in the specs, matching the CLI's own documented hints (`--model <model>`, `--resume [chatId]`).
+- **No commands after an optional-value option**: after `--resume`, `-w/--worktree`, or a bare worker `--pool`, no commands are offered except the worker `--pool` stop words, because the CLI takes the next word as the value.
 
 ## Implementation steps
 
