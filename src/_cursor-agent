@@ -709,27 +709,29 @@ _cursor_agent_persist() {
     return
   fi
 
-  case $words[2] in
-    attach|help|list|stop)
-      # Drop "persist" so the leaf sees its own name as words[1].
-      shift words
-      (( CURRENT-- ))
-      case $words[1] in
-        attach) _cursor_agent_persist_attach ;;
-        help)   _cursor_agent_persist_help ;;
-        list)   _cursor_agent_persist_list ;;
-        stop)   _cursor_agent_persist_stop ;;
-      esac
-      ;;
-    -h|--help)
-      # The hand-rolled parser prints usage and exits; nothing follows.
-      _message 'no more arguments' ;;
-    *)
-      # The first word after persist began the forwarded root argv: keep
-      # offering root options, and accept free-text prompt words.
-      _arguments \
-        $global_options \
-        '*:prompt:' ;;
+  if [[ $words[2] == (-h|--help) ]]; then
+    # The hand-rolled parser prints usage and exits; nothing follows.
+    _message 'no more arguments'
+    return
+  fi
+
+  if [[ $words[2] != (attach|help|list|stop) ]]; then
+    # The first word after persist began the forwarded root argv: keep
+    # offering root options, and accept free-text prompt words.
+    _arguments \
+      $global_options \
+      '*:prompt:'
+    return
+  fi
+
+  # Drop "persist" so the leaf sees its own name as words[1].
+  shift words
+  (( CURRENT-- ))
+  case $words[1] in
+    attach) _cursor_agent_persist_attach ;;
+    help)   _cursor_agent_persist_help ;;
+    list)   _cursor_agent_persist_list ;;
+    stop)   _cursor_agent_persist_stop ;;
   esac
 }
 

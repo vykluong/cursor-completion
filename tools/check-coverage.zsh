@@ -89,9 +89,10 @@
 #     `_describe` rosters in F(P) and F(P)_commands, and against the
 #     `case $words[1]` (or `$line[1]`) dispatch arms of F(P). The expected
 #     tag: an entry with its own `hidden` flag (`hidden`, `hidden=cond`) goes
-#     in `hidden-commands`; a gated entry whose parent is not gated goes in
+#     in `hidden-commands`; an entry whose own tier is gated (the gated
+#     commands and every subcommand inside a gated tree) goes in
 #     `gated-commands`; everything else, including the children of a hidden
-#     or gated command, goes in `commands`.
+#     command, goes in `commands`.
 #   - Dev-only (tier 4) commands, options and grammar flags must be absent:
 #     roster entries, dispatch arms, functions and option specs for them are
 #     `dev-only` findings.
@@ -891,7 +892,7 @@ sub long_of { (sort { length $b <=> length $a || $a cmp $b } @_)[0] }
 sub expected_tag {
   my ($p, $c) = @_;
   return 'hidden-commands' if $c->{hidden};
-  return 'gated-commands' if $c->{tier} =~ /^gated:/ && $PATH{$p}{tier} !~ /^gated:/;
+  return 'gated-commands' if $c->{tier} =~ /^gated:/;
   return 'commands';
 }
 

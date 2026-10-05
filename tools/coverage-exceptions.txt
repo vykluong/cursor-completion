@@ -24,3 +24,13 @@
 
 _cursor_agent | enum-extra | --http-version | no .choices() in the CLI; the values (1.1 2) come from its own description ("1.1 or 2")
 _cursor_agent | enum-extra | --repo-http-version | no .choices() in the CLI; the values (1.1 2) come from its own description ("1.1 or 2")
+
+# persist is parsed by hand before commander; the snapshot's builtin -h/--help
+# records for its leaves assume commander. The hand-rolled parser reads the
+# word after attach/stop as the session name, and rejects extra words after list.
+_cursor_agent_persist_attach | opt-missing | --help | hand-rolled parser: `persist attach --help` takes --help as the session name
+_cursor_agent_persist_list | opt-missing | --help | hand-rolled parser: `persist list` accepts no further words, so --help is a usage error
+_cursor_agent_persist_stop | opt-missing | --help | hand-rolled parser: `persist stop --help` takes --help as the session name
+
+_cursor_agent_worker | opt-repeat | --label | repeatable per its own description ("can be used multiple times"); the miner does not tag it repeatable
+_cursor_agent_worker_controller | opt-repeat | --pool | repeatable per its own description ("(repeatable)"); the miner does not tag it repeatable
