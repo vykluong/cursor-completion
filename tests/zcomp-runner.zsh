@@ -2,7 +2,9 @@
 # Capture the completion candidates _cursor-agent offers for a given buffer.
 # Usage:  zsh tests/zcomp-runner.zsh 'agent '           # single TAB (default)
 #         DOUBLE_TAB=1 zsh tests/zcomp-runner.zsh 'agent '   # press TAB twice
-# Output: sorted unique candidates, one per line. `_message` hints print as "MSG: <text>".
+# Output: sorted unique candidates, one per line. `_message` hints print as
+# "MSG: " followed by the full `_message` argument list (flags and tag
+# included, e.g. "MSG: -e option--model-1 model name (...)").
 # Exit: 0 when _cursor-agent was loaded, ran for the buffer, and returned
 # without a shell error (status 0 or 1); 3 otherwise (script failed to load,
 # prompt timed out, or the buffer never reached _cursor-agent). Empty output
