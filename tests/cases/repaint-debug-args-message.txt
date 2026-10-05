@@ -1,0 +1,2 @@
+buffer='agent repaint-debug --foo '
+MSG: -e argument-rest agent arguments

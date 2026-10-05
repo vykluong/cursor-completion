@@ -1,0 +1,3 @@
+buffer='agent uninstall-shell-integration -'
+--help
+-h

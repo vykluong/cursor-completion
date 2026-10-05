@@ -1,0 +1,3 @@
+buffer='agent install-shell-integration -'
+--help
+-h

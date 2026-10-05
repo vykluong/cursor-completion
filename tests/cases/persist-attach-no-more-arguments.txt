@@ -1,0 +1,2 @@
+buffer='agent persist attach s1 '
+MSG: no more arguments

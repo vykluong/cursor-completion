@@ -1,0 +1,4 @@
+buffer='agent install -'
+--help
+-h
+MSG: -e argument-1 version

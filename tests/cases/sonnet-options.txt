@@ -1,0 +1,4 @@
+buffer='agent sonnet -'
+--help
+-h
+MSG: -e argument-rest initial prompt for the agent

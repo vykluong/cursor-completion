@@ -1,0 +1,2 @@
+buffer='agent install 2026.10.01 '
+MSG: -e argument-2 URL prefix

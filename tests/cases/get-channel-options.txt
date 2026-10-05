@@ -1,0 +1,3 @@
+buffer='agent get-channel -'
+--help
+-h

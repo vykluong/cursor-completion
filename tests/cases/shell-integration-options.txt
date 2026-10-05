@@ -1,0 +1,3 @@
+buffer='agent shell-integration -'
+--help
+-h
