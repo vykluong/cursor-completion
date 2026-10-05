@@ -1,0 +1,4 @@
+buffer='agent env list --scope '
+all
+personal
+team

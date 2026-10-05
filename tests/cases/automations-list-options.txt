@@ -1,0 +1,6 @@
+buffer='agent automations list -'
+--format
+--help
+--managed-by
+--scope
+-h

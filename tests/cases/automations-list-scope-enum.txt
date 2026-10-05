@@ -1,0 +1,7 @@
+buffer='agent automations list --scope '
+all
+team
+team_editable
+team_editable_user
+team_visible
+user

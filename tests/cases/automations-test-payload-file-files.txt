@@ -1,0 +1,3 @@
+buffer='agent automations test --payload-file /etc/ho'
+# mode: contains
+hosts

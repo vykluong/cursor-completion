@@ -1,0 +1,3 @@
+buffer='agent cloud get --format '
+json
+text

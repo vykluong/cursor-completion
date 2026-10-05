@@ -1,0 +1,4 @@
+buffer='agent automations pull /usr/'
+# mode: contains
+bin
+share

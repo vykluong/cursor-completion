@@ -1,0 +1,2 @@
+buffer='agent automations list --a'
+MSG: no arguments

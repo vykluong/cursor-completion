@@ -1,0 +1,5 @@
+buffer='agent automations runs get -'
+--format
+--help
+-h
+MSG: -e argument-1 background composer ID

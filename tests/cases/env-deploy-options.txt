@@ -1,0 +1,9 @@
+buffer='agent env deploy -'
+--delete-personal-on-team-write
+--git-enterprise-uuid
+--help
+--name
+--repo
+--scm-repo-node-id
+--team
+-h

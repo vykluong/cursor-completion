@@ -1,0 +1,2 @@
+buffer='agent automations adopt --key '
+MSG: -e option--key-1 deploy key

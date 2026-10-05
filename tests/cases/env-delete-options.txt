@@ -1,0 +1,7 @@
+buffer='agent env delete -'
+--dry-run
+--help
+--team
+--yes
+-h
+MSG: -e argument-1 environment ID

@@ -1,0 +1,8 @@
+buffer='agent automations runs list -'
+--cursor
+--format
+--help
+--kind
+--limit
+-h
+MSG: -e argument-1 automation deploy key or UUID

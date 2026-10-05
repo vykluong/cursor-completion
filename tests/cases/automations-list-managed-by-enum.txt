@@ -1,0 +1,5 @@
+buffer='agent automations list --managed-by '
+all
+ANY
+DEPLOY
+UI

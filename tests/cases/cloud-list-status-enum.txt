@@ -1,0 +1,8 @@
+buffer='agent cloud list --status '
+all
+archived
+creating
+error
+expired
+finished
+running

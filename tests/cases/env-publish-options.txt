@@ -1,0 +1,6 @@
+buffer='agent env publish -'
+--format
+--help
+--team
+-h
+MSG: -e argument-1 environment ID

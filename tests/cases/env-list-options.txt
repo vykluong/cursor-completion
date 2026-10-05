@@ -1,0 +1,7 @@
+buffer='agent env list -'
+--format
+--help
+--limit
+--scope
+-h
+-n

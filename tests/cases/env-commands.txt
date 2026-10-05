@@ -1,0 +1,6 @@
+buffer='agent env '
+delete
+deploy
+get
+list
+publish

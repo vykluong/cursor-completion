@@ -1,0 +1,7 @@
+buffer='agent automations adopt -'
+--dry-run
+--help
+--key
+--managed-by
+-h
+MSG: -e argument-1 automation deploy key or UUID

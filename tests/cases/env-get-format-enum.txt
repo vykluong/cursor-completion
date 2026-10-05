@@ -1,0 +1,3 @@
+buffer='agent env get --format '
+json
+text

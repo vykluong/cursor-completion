@@ -1,0 +1,10 @@
+buffer='agent automations '
+adopt
+delete
+deploy
+get
+list
+pull
+runs
+test
+validate

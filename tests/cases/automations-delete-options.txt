@@ -1,0 +1,6 @@
+buffer='agent automations delete -'
+--dry-run
+--help
+--yes
+-h
+MSG: -e argument-1 automation deploy key or UUID

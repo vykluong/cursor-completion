@@ -1,0 +1,5 @@
+buffer='agent cloud get -'
+--format
+--help
+-h
+MSG: -e argument-1 cloud agent ID (background composer ID)

@@ -1,0 +1,2 @@
+buffer='agent automations test --payload '
+MSG: -e option--payload-1 json

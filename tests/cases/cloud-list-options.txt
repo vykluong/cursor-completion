@@ -1,0 +1,9 @@
+buffer='agent cloud list -'
+--format
+--help
+--limit
+--repo
+--status
+--team
+-h
+-n

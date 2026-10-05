@@ -1,0 +1,11 @@
+buffer='agent automations test -'
+--format
+--help
+--payload
+--payload-file
+--test-branch
+--test-repo
+--trigger
+--trigger-index
+-h
+MSG: -e argument-1 automation deploy key or UUID

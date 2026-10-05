@@ -1,0 +1,6 @@
+buffer='agent cloud transcript -'
+--format
+--help
+--stdout
+-h
+MSG: -e argument-1 cloud agent ID (background composer ID)

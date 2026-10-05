@@ -1,0 +1,2 @@
+buffer='agent automations runs list --cursor '
+MSG: -e option--cursor-1 cursor (UUID of last run)

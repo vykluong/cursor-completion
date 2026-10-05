@@ -454,9 +454,316 @@ _cursor_agent_worker_server() {
 # ===========================================================================
 
 # --- Gated command trees ---
-_cursor_agent_automations() { _message 'automations subcommand' }
-_cursor_agent_cloud() { _message 'cloud subcommand' }
-_cursor_agent_env() { _message 'env subcommand' }
+# Each tree below is gate-dependent (Statsig, per account) and known from
+# static mining only. automations, cloud and env carry their own action, so
+# commander adds no builtin help subcommand to them; only automations runs
+# (subcommands, no action) has one.
+
+# ---------------------------------------------------------------------------
+# automations (gated)
+# ---------------------------------------------------------------------------
+_cursor_agent_automations() {
+  local curcontext="$curcontext" state line context
+  typeset -A opt_args
+
+  _arguments -C \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_automations_commands' \
+    '*:: :->args'
+
+  case $state in
+    args)
+      case $words[1] in
+        adopt)    _cursor_agent_automations_adopt ;;
+        delete)   _cursor_agent_automations_delete ;;
+        deploy)   _cursor_agent_automations_deploy ;;
+        get)      _cursor_agent_automations_get ;;
+        list)     _cursor_agent_automations_list ;;
+        pull)     _cursor_agent_automations_pull ;;
+        runs)     _cursor_agent_automations_runs ;;
+        test)     _cursor_agent_automations_test ;;
+        validate) _cursor_agent_automations_validate ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_automations_commands() {
+  local -a automations_commands
+  automations_commands=(
+    'adopt:Bind a deploy key to an existing automation so future deploys update it'
+    'delete:Delete an automation by deploy key or automation UUID'
+    'deploy:Deploy a declarative automation YAML file'
+    'get:Fetch a single automation by deploy key or automation UUID'
+    'list:List automations visible to the authenticated user'
+    'pull:Download visible automations as YAML deploy specs'
+    'runs:Inspect automation runs (list recent runs, get one run)'
+    'test:Trigger a test run of an automation with a synthetic sample payload'
+    'validate:Validate a declarative automation YAML file'
+  )
+  _describe -t gated-commands 'automations commands' automations_commands
+}
+
+_cursor_agent_automations_adopt() {
+  _arguments \
+    '--dry-run[Print the adopt request without executing]' \
+    '--key[Deploy key to bind to the automation]:deploy key:' \
+    '--managed-by[Authoring mode after adoption (ANY keeps the dashboard editable; DEPLOY makes the deploy spec authoritative)]:authoring mode:(ANY DEPLOY)' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation deploy key or UUID:'
+}
+
+_cursor_agent_automations_delete() {
+  _arguments \
+    '--dry-run[Print the delete request without executing]' \
+    '--yes[Skip confirmation (required unless --dry-run)]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation deploy key or UUID:'
+}
+
+_cursor_agent_automations_deploy() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation YAML file:_files'
+}
+
+_cursor_agent_automations_get() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '--yaml[Emit the automation as a deploy-ready YAML document]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation deploy key or UUID:'
+}
+
+_cursor_agent_automations_list() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '--managed-by[Filter by authoring mode]:authoring mode:(UI DEPLOY ANY all)' \
+    '--scope[Filter by automation scope]:scope:(user team_visible team_editable_user team_editable team all)' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_automations_pull() {
+  _arguments \
+    '--include-ui[Include UI-managed automations (not just DEPLOY/ANY)]' \
+    '--stdout[Emit JSON-per-line records instead of writing to disk]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:output directory (default ./automations):_directories'
+}
+
+_cursor_agent_automations_test() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '--payload[Inline JSON string whose fields populate the sample payload]:json:' \
+    '--payload-file[Path to a JSON file whose fields populate the sample payload]:file:_files' \
+    '--test-branch[Workflow-level branch override for non-git triggers]:branch:' \
+    '--test-repo[Workflow-level repo override for non-git triggers]:repository URL:' \
+    '--trigger[Which trigger kind to simulate]:trigger kind:(cron pr push slack linear ci webhook slack-channel-created pagerduty sentry)' \
+    '--trigger-index[Index of the trigger to test (0-based; defaults to 0)]:index:' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation deploy key or UUID:'
+}
+
+_cursor_agent_automations_validate() {
+  _arguments \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation YAML file:_files'
+}
+
+# --- automations runs (gated) ---
+_cursor_agent_automations_runs() {
+  local curcontext="$curcontext" state line context
+  typeset -A opt_args
+
+  _arguments -C \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_automations_runs_commands' \
+    '*:: :->args'
+
+  case $state in
+    args)
+      case $words[1] in
+        get)  _cursor_agent_automations_runs_get ;;
+        help) _cursor_agent_automations_runs_help ;;
+        list) _cursor_agent_automations_runs_list ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_automations_runs_commands() {
+  local -a automations_runs_commands
+  automations_runs_commands=(
+    'get:Fetch a single automation run by background composer ID'
+    'help:Display help for command'
+    'list:List recent runs for a given automation (by deploy key or UUID)'
+  )
+  _describe -t gated-commands 'automations runs commands' automations_runs_commands
+}
+
+_cursor_agent_automations_runs_get() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:background composer ID:'
+}
+
+# Commander's builtin help: completes the automations runs command names.
+_cursor_agent_automations_runs_help() {
+  _arguments \
+    '1:command:_cursor_agent_automations_runs_commands'
+}
+
+_cursor_agent_automations_runs_list() {
+  _arguments \
+    '--cursor[Pagination cursor (UUID of last run)]:cursor (UUID of last run):' \
+    '--format[Output format]:format:(text json)' \
+    '--kind[Which category of runs to list]:kind:(execution filter)' \
+    '--limit[Max number of runs to return (default 50)]:number:' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:automation deploy key or UUID:'
+}
+
+# ---------------------------------------------------------------------------
+# cloud (gated)
+# ---------------------------------------------------------------------------
+_cursor_agent_cloud() {
+  local curcontext="$curcontext" state line context
+  typeset -A opt_args
+
+  _arguments -C \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_cloud_commands' \
+    '*:: :->args'
+
+  case $state in
+    args)
+      case $words[1] in
+        get)        _cursor_agent_cloud_get ;;
+        list)       _cursor_agent_cloud_list ;;
+        transcript) _cursor_agent_cloud_transcript ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_cloud_commands() {
+  local -a cloud_commands
+  cloud_commands=(
+    'get:Fetch a single cloud agent by background composer ID'
+    'list:List cloud agents'
+    "transcript:Fetch a cloud agent's conversation transcript as JSONL"
+  )
+  _describe -t gated-commands 'cloud commands' cloud_commands
+}
+
+_cursor_agent_cloud_get() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:cloud agent ID (background composer ID):'
+}
+
+_cursor_agent_cloud_list() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-n --limit)'{-n,--limit}'[Maximum number of agents to return]:number:' \
+    '--repo[Filter by repository URL]:repository URL:' \
+    '--status[Filter by status]:status:(running finished error creating expired archived all)' \
+    '--team[Include team-wide agents]' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_cloud_transcript() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '--stdout[Print transcript JSONL to stdout instead of writing to disk]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:cloud agent ID (background composer ID):'
+}
+
+# ---------------------------------------------------------------------------
+# env (gated)
+# ---------------------------------------------------------------------------
+_cursor_agent_env() {
+  local curcontext="$curcontext" state line context
+  typeset -A opt_args
+
+  _arguments -C \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1: :_cursor_agent_env_commands' \
+    '*:: :->args'
+
+  case $state in
+    args)
+      case $words[1] in
+        delete)  _cursor_agent_env_delete ;;
+        deploy)  _cursor_agent_env_deploy ;;
+        get)     _cursor_agent_env_get ;;
+        list)    _cursor_agent_env_list ;;
+        publish) _cursor_agent_env_publish ;;
+      esac
+      ;;
+  esac
+}
+
+_cursor_agent_env_commands() {
+  local -a env_commands
+  env_commands=(
+    'delete:Delete an environment by id'
+    "deploy:Save an environment.json file to the user's personal environment for a repo"
+    'get:Fetch the environment.json for a repo'
+    'list:List cloud-agent environments'
+    'publish:Publish an environment to GitHub via a PR that writes .cursor/environment.json'
+  )
+  _describe -t gated-commands 'env commands' env_commands
+}
+
+_cursor_agent_env_delete() {
+  _arguments \
+    '--dry-run[Print the delete request without executing]' \
+    '--team[Treat the id as a team environment id]' \
+    '--yes[Skip confirmation (required unless --dry-run)]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:environment ID:'
+}
+
+_cursor_agent_env_deploy() {
+  _arguments \
+    '--delete-personal-on-team-write[When saving to --team, also delete the personal environment for this repo]' \
+    '--git-enterprise-uuid[Git enterprise UUID for GHE / GitLab self-hosted]:uuid:' \
+    '--name[Display name for the environment]:name:' \
+    '--repo[Repository URL this environment applies to]:repository URL:' \
+    '--scm-repo-node-id[GitHub node_id or GitLab project id for this repo (required with --team)]:SCM repo node ID:' \
+    '--team[Save as a team environment instead of personal (requires --scm-repo-node-id)]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:environment.json file:_files'
+}
+
+_cursor_agent_env_get() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    "--personal-only[Only fetch the user's personal environment.json override]" \
+    "--ref[Git ref to read the repo's .cursor/environment.json from (defaults to HEAD)]:git ref:" \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:repository URL:'
+}
+
+_cursor_agent_env_list() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '(-n --limit)'{-n,--limit}'[Maximum number of environments]:number:' \
+    '--scope[Filter by environment scope]:scope:(personal team all)' \
+    '(-h --help)'{-h,--help}'[Display help for command]'
+}
+
+_cursor_agent_env_publish() {
+  _arguments \
+    '--format[Output format]:format:(text json)' \
+    '--team[Treat the id as a team environment id]' \
+    '(-h --help)'{-h,--help}'[Display help for command]' \
+    '1:environment ID:'
+}
 
 # ===========================================================================
 # End of gated (tier 3) block.
