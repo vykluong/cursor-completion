@@ -619,6 +619,13 @@ _cursor_agent_worker() {
     '--worker-id[Explicit, stable worker id to register with (can also use CURSOR_AGENT_WORKER_ID env var)]:worker ID:'
   )
 
+  # A stop word right after --pool is the subcommand, not the pool name, so
+  # drop the optional value from the --pool spec for this call.
+  local -i pool=${words[(i)--pool]}
+  if (( pool + 1 < CURRENT )) && [[ $words[pool+1] == (start|controller|debug|help) ]]; then
+    worker_options[(r)--pool\[*]=${worker_options[(r)--pool\[*]%%::*}
+  fi
+
   _arguments -C -A '-*' \
     $worker_options \
     '1: :_cursor_agent_worker_commands' \
@@ -839,7 +846,7 @@ _cursor_agent_sandbox_run() {
     '--sandbox[Run with sandbox (workspace_readwrite policy)]' \
     '--sb-debug[Write sandbox debug logs to a temp folder and print the path]' \
     '(-h --help)'{-h,--help}'[Display help for command]' \
-    '1:command to run:_command_names -e' \
+    '1:command to run: _command_names -e' \
     '*:command arguments:_files'
 }
 

@@ -1,0 +1,6 @@
+buffer='agent worker --pool help '
+controller
+debug
+help
+self-test
+start

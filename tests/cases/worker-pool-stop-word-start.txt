@@ -1,0 +1,4 @@
+buffer='agent worker --pool start -'
+--help
+--verbose
+-h
