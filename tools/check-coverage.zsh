@@ -144,7 +144,9 @@
 #     per-subcommand spec inside a named arm is exit 2 (move it into that
 #     subcommand's function).
 #   - Rosters: `_describe -t <tag> '<description>' <array>` over arrays of
-#     `name:description` entries (`\:` escapes a colon in the name).
+#     `name:description` entries (`\:` escapes a colon in the name), or
+#     `_cursor_agent_describe_groups` with `<tag> '<description>' <array>`
+#     triples over the same kind of arrays.
 
 emulate -L zsh
 setopt extended_glob no_unset pipe_fail
@@ -597,7 +599,7 @@ for my $fn (@FNORDER) {
     my $name = wtext($w[0][1]);
     my ($arm) = map { $_->{arm} } grep { $_->{disp} && $_->{state} eq 'body' } reverse @stack;
     $arm = $arm->[0] if ref $arm eq 'ARRAY';
-    if ($name eq '_arguments' || $name eq '_describe') {
+    if ($name eq '_arguments' || $name eq '_describe' || $name eq '_cursor_agent_describe_groups') {
       if ($arm && !grep { $_ eq '*' } @{$arm->{pats}}) {
         fail("$SCRIPT:$w[0][2]: $name inside dispatch arm '" . join('|', @{$arm->{pats}}) . ")' of $fn; "
           . "move it into that subcommand's own function");
@@ -795,6 +797,22 @@ for my $c (@CMDS) {
   my @w = @{$c->{words}};
   my $name = wtext((shift @w)->[1]);
   my @items = expand_args($fn, \@w);
+  if ($name eq '_cursor_agent_describe_groups') {
+    fail("$SCRIPT:$c->{line}: _cursor_agent_describe_groups in $fn: expected <tag> <description> <array> triples")
+      unless @items && @items % 3 == 0;
+    while (my ($tg, $ds, $an) = splice(@items, 0, 3)) {
+      fail("$SCRIPT:$c->{line}: _cursor_agent_describe_groups in $fn: expected an array name, got '$an->[0]'")
+        unless $an->[0] =~ /^[A-Za-z_]\w*$/;
+      for my $e (@{array_of($fn, $an->[0], $an->[2])}) {
+        for my $s (expand_word($e->[1], $e->[2])) {
+          my ($n) = split_unescaped_colon($s);
+          $n =~ s/\\(.)/$1/g;
+          push @{$SROSTER{$fn}}, [$n, $tg->[0], $e->[2]];
+        }
+      }
+    }
+    next;
+  }
   if ($name eq '_describe') {
     my ($tag, $descr, @arrs) = ('');
     while (@items) {
@@ -1036,8 +1054,10 @@ for my $p (sort keys %PATH) {
     $want{$_} = [$k, $tag] for @{$kids->{$k}{aliases}};
   }
   my %got;      # word -> [ [tag, line] ]
+  my %seen;     # one array entry offered by several roster calls counts once
   for my $src ($fn, "${fn}_commands") {
-    push @{$got{$_->[0]}}, [$_->[1], $_->[2]] for @{$SROSTER{$src} || []};
+    push @{$got{$_->[0]}}, [$_->[1], $_->[2]]
+      for grep { !$seen{"$_->[0]\0$_->[1]\0$_->[2]"}++ } @{$SROSTER{$src} || []};
   }
   my %devk = %{$DEVCHILD{$p} || {}};
   for my $w (sort keys %want) {

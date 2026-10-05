@@ -10,8 +10,6 @@ create-chat
 env
 generate-rule
 get-channel
-gpt-5
-gpt5
 help
 install
 install-shell-integration
@@ -21,7 +19,6 @@ logout
 ls
 mcp
 models
-opus
 persist
 plugin
 record
@@ -32,7 +29,6 @@ rule
 sandbox
 set-channel
 shell-integration
-sonnet
 status
 team
 uninstall-shell-integration

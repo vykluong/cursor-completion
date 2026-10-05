@@ -1,2 +1,0 @@
-buffer='agent opus --model '
-MSG: -e argument-rest initial prompt for the agent

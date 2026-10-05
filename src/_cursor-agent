@@ -192,18 +192,14 @@ _cursor_agent() {
         acp)                         _cursor_agent_acp ;;
         cleanup-install-versions)    _cursor_agent_cleanup_install_versions ;;
         get-channel)                 _cursor_agent_get_channel ;;
-        gpt-5)                       _cursor_agent_gpt_5 ;;
-        gpt5)                        _cursor_agent_gpt5 ;;
         install)                     _cursor_agent_install ;;
         local-worker)                _cursor_agent_local_worker ;;
-        opus)                        _cursor_agent_opus ;;
         record)                      _cursor_agent_record ;;
         repaint-debug)               _cursor_agent_repaint_debug ;;
         repo)                        _cursor_agent_repo ;;
         sandbox)                     _cursor_agent_sandbox ;;
         set-channel)                 _cursor_agent_set_channel ;;
         shell-integration)           _cursor_agent_shell_integration ;;
-        sonnet)                      _cursor_agent_sonnet ;;
         upgrade)                     _cursor_agent_upgrade ;;
         worker-server)               _cursor_agent_worker_server ;;
         # Gated (tier 3): gate-dependent, known from static mining only.
@@ -221,6 +217,31 @@ _cursor_agent() {
       esac
       ;;
   esac
+}
+
+# Offer several "name:description" rosters, each under its own tag, with the
+# descriptions aligned in one column. Separate _describe calls pad each roster
+# to its own longest name, so a merged listing would show ragged columns.
+# Usage: _cursor_agent_describe_groups <tag> <description> <array-name> ...
+_cursor_agent_describe_groups() {
+  local tag descr name entry sep expl
+  local -a names displays
+  local -i width=0 ret=1
+  zstyle -s ":completion:${curcontext}:" list-separator sep || sep=--
+  for tag descr name in "$@"; do
+    for entry in "${(@P)name}"; do
+      (( ${#entry%%:*} > width )) && width=${#entry%%:*}
+    done
+  done
+  for tag descr name in "$@"; do
+    names=() displays=()
+    for entry in "${(@P)name}"; do
+      names+=("${entry%%:*}")
+      displays+=("${(r:width:)${entry%%:*}}  $sep ${entry#*:}")
+    done
+    _wanted $tag expl $descr compadd -l -d displays -a names && ret=0
+  done
+  return ret
 }
 
 _cursor_agent_commands() {
@@ -253,26 +274,21 @@ _cursor_agent_commands() {
   # Hidden: absent from "agent --help". Registered as .command(name,
   # {hidden:!0}) in ./src/cli.ts and verified by the drift tool, which found
   # each command's own usage line in its --help output. The model shortcuts
-  # opus, sonnet, gpt5 and gpt-5 are registered the same way.
-  # gpt5 and gpt-5 share a description upstream; gpt5 gets "(alias)" so
-  # _describe does not merge them onto one line, which would list this whole
-  # group apart from the others instead of in one sorted list.
+  # (gpt-5, gpt5, opus, sonnet) are registered the same way but deliberately
+  # left out: "agent --model <model>" replaces them (see
+  # tools/coverage-exceptions.txt).
   hidden_commands=(
     'acp:Start the Cursor Agent as an ACP (Agent Client Protocol) server'
     'cleanup-install-versions:Remove stale Cursor Agent install versions'
     'get-channel:Get the configured channel for the Cursor Agent'
-    'gpt-5:Start the Cursor Agent with the GPT-5 model'
-    'gpt5:Start the Cursor Agent with the GPT-5 model (alias)'
     'install:Install Cursor Agent with specified version and URL prefix'
     'local-worker:Manage local worker server'
-    'opus:Start the Cursor Agent with the Opus model'
     'record:Run a shell under terminal capture (used by shell integration)'
     'repaint-debug:Launch agent-cli in a PTY with a browser repaint visualizer'
     'repo:Manage repository'
     'sandbox:Sandbox configuration and execution commands'
     'set-channel:Set the channel for the Cursor Agent'
     'shell-integration:Print the shell integration script for a shell'
-    'sonnet:Start the Cursor Agent with the Sonnet model'
     'upgrade:Update Cursor Agent to the latest version (alias for update)'
     'worker-server:Run a worker server'
   )
@@ -284,9 +300,10 @@ _cursor_agent_commands() {
     'cloud:Manage cloud agents (list, get, transcript)'
     'env:Manage cloud-agent environments (list, get, deploy, publish, delete)'
   )
-  _describe -t commands 'agent commands' commands
-  _describe -t hidden-commands 'hidden commands' hidden_commands
-  _describe -t gated-commands 'gated commands' gated_commands
+  _cursor_agent_describe_groups \
+    commands 'agent commands' commands \
+    hidden-commands 'hidden commands' hidden_commands \
+    gated-commands 'gated commands' gated_commands
 }
 
 # --- Command trees ---
@@ -546,8 +563,9 @@ _cursor_agent_bedrock_commands() {
   hidden_commands=(
     'use-team-role:Enable bedrock configured by your team'
   )
-  _describe -t commands 'bedrock commands' commands
-  _describe -t hidden-commands 'hidden commands' hidden_commands
+  _cursor_agent_describe_groups \
+    commands 'bedrock commands' commands \
+    hidden-commands 'hidden commands' hidden_commands
 }
 
 _cursor_agent_bedrock_clear() {
@@ -689,11 +707,15 @@ _cursor_agent_worker_commands() {
   hidden_commands=(
     'self-test:Verify this build can analyze a shell command with its tree-sitter natives'
   )
-  _describe -t commands 'worker commands' commands
   # After a bare --pool, only the stop words (start, controller, debug,
   # help), which are exactly the visible commands, stay the subcommand.
-  (( ${pool_stop_words:-0} )) && return
-  _describe -t hidden-commands 'hidden commands' hidden_commands
+  if (( ${pool_stop_words:-0} )); then
+    _cursor_agent_describe_groups commands 'worker commands' commands
+  else
+    _cursor_agent_describe_groups \
+      commands 'worker commands' commands \
+      hidden-commands 'hidden commands' hidden_commands
+  fi
 }
 
 # Exclusion groups mirror the .conflicts() calls: --pool and --warm-idle
@@ -922,8 +944,9 @@ _cursor_agent_repo_commands() {
   hidden_commands=(
     'search:Search repository code using semantic search'
   )
-  _describe -t commands 'repo commands' commands
-  _describe -t hidden-commands 'hidden commands' hidden_commands
+  _cursor_agent_describe_groups \
+    commands 'repo commands' commands \
+    hidden-commands 'hidden commands' hidden_commands
 }
 
 # Commander's builtin help: completes the repo command names.
@@ -1105,32 +1128,11 @@ _cursor_agent_get_channel() {
     '(-h --help)'{-h,--help}'[Display help for command]'
 }
 
-# Model shortcut: agent gpt-5 [prompt...].
-_cursor_agent_gpt_5() {
-  _arguments \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
-    '*:initial prompt for the agent:'
-}
-
-# Model shortcut: agent gpt5 [prompt...].
-_cursor_agent_gpt5() {
-  _arguments \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
-    '*:initial prompt for the agent:'
-}
-
 _cursor_agent_install() {
   _arguments \
     '(-h --help)'{-h,--help}'[Display help for command]' \
     '1:version:' \
     '2:URL prefix:'
-}
-
-# Model shortcut: agent opus [prompt...].
-_cursor_agent_opus() {
-  _arguments \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
-    '*:initial prompt for the agent:'
 }
 
 _cursor_agent_record() {
@@ -1157,13 +1159,6 @@ _cursor_agent_shell_integration() {
   _arguments \
     '(-h --help)'{-h,--help}'[Display help for command]' \
     '1:shell:(zsh)'
-}
-
-# Model shortcut: agent sonnet [prompt...].
-_cursor_agent_sonnet() {
-  _arguments \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
-    '*:initial prompt for the agent:'
 }
 
 _cursor_agent_upgrade() {

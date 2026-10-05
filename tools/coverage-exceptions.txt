@@ -34,3 +34,21 @@ _cursor_agent_persist_stop | opt-missing | --help | hand-rolled parser: `persist
 
 _cursor_agent_worker | opt-repeat | --label | repeatable per its own description ("can be used multiple times"); the miner does not tag it repeatable
 _cursor_agent_worker_controller | opt-repeat | --pool | repeatable per its own description ("(repeatable)"); the miner does not tag it repeatable
+
+# Model shortcuts: hidden commands that start a session with a fixed model.
+# "agent --model <model>" is the standard way to pick a model, so they are
+# left out of the roster, the dispatch and the function set.
+_cursor_agent | cmd-missing | gpt-5 | model shortcut; use agent --model instead
+_cursor_agent | dispatch-missing | gpt-5 | model shortcut; use agent --model instead
+_cursor_agent_gpt_5 | function-missing | _cursor_agent_gpt_5 | model shortcut; use agent --model instead
+_cursor_agent | cmd-missing | gpt5 | model shortcut; use agent --model instead
+_cursor_agent | dispatch-missing | gpt5 | model shortcut; use agent --model instead
+_cursor_agent_gpt5 | function-missing | _cursor_agent_gpt5 | model shortcut; use agent --model instead
+_cursor_agent | cmd-missing | opus | model shortcut; use agent --model instead
+_cursor_agent | dispatch-missing | opus | model shortcut; use agent --model instead
+_cursor_agent_opus | function-missing | _cursor_agent_opus | model shortcut; use agent --model instead
+_cursor_agent | cmd-missing | sonnet | model shortcut; use agent --model instead
+_cursor_agent | dispatch-missing | sonnet | model shortcut; use agent --model instead
+_cursor_agent_sonnet | function-missing | _cursor_agent_sonnet | model shortcut; use agent --model instead
+
+_cursor_agent_describe_groups | function-extra | _cursor_agent_describe_groups | helper: offers several tagged rosters with one aligned description column

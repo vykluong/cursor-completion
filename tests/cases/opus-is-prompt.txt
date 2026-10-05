@@ -1,0 +1,4 @@
+buffer='agent opus --mo'
+--mode
+--model
+MSG: -e argument-rest prompt
