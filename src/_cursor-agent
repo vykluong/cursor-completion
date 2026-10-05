@@ -254,12 +254,15 @@ _cursor_agent_commands() {
   # {hidden:!0}) in ./src/cli.ts and verified by the drift tool, which found
   # each command's own usage line in its --help output. The model shortcuts
   # opus, sonnet, gpt5 and gpt-5 are registered the same way.
+  # gpt5 and gpt-5 share a description upstream; gpt5 gets "(alias)" so
+  # _describe does not merge them onto one line, which would list this whole
+  # group apart from the others instead of in one sorted list.
   hidden_commands=(
     'acp:Start the Cursor Agent as an ACP (Agent Client Protocol) server'
     'cleanup-install-versions:Remove stale Cursor Agent install versions'
     'get-channel:Get the configured channel for the Cursor Agent'
     'gpt-5:Start the Cursor Agent with the GPT-5 model'
-    'gpt5:Start the Cursor Agent with the GPT-5 model'
+    'gpt5:Start the Cursor Agent with the GPT-5 model (alias)'
     'install:Install Cursor Agent with specified version and URL prefix'
     'local-worker:Manage local worker server'
     'opus:Start the Cursor Agent with the Opus model'
