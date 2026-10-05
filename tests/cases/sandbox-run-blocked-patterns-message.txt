@@ -1,0 +1,2 @@
+buffer='agent sandbox run --blocked-patterns '
+MSG: -e option--blocked-patterns-1 patterns

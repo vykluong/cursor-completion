@@ -1,0 +1,3 @@
+buffer='agent repo info -'
+--help
+-h

@@ -1,0 +1,5 @@
+buffer='agent local-worker help '
+help
+kill
+ping
+sleep

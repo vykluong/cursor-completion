@@ -1,0 +1,2 @@
+buffer='agent bedrock configure --region '
+MSG: -e option--region-1 region

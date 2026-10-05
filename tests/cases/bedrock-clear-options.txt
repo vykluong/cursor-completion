@@ -1,0 +1,3 @@
+buffer='agent bedrock clear -'
+--help
+-h

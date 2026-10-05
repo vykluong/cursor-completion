@@ -1,0 +1,4 @@
+buffer='agent plugin marketplace remove -'
+--help
+-h
+MSG: -e argument-1 marketplace name or git URL (run agent plugin marketplace list to see them)

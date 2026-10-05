@@ -1,0 +1,2 @@
+buffer='agent worker --label a=b --l'
+--label

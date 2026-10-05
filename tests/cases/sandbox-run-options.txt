@@ -1,0 +1,8 @@
+buffer='agent sandbox run --'
+--allow-paths
+--blocked-patterns
+--help
+--network
+--readonly-paths
+--sandbox
+--sb-debug

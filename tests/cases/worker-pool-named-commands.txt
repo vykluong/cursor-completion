@@ -1,0 +1,6 @@
+buffer='agent worker --pool gpu '
+controller
+debug
+help
+self-test
+start

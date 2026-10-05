@@ -1,0 +1,6 @@
+buffer='agent worker controller --warm-idle 2 -'
+--help
+--pool
+--repository
+--spawn
+-h

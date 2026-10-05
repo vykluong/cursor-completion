@@ -1,0 +1,4 @@
+buffer='agent worker debug -'
+--help
+--json
+-h

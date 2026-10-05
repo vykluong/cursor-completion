@@ -1,0 +1,2 @@
+buffer='agent team switch '
+MSG: -e argument-1 team ID or name (run agent team list to see them)

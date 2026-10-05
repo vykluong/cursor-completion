@@ -1,0 +1,4 @@
+buffer='agent plugin marketplace list -'
+--format
+--help
+-h

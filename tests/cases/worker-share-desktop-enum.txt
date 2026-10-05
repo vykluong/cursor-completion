@@ -1,0 +1,8 @@
+buffer='agent worker --share-desktop '
+controller
+debug
+help
+self-test
+start
+view
+view_and_control

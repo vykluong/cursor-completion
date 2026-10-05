@@ -1,0 +1,2 @@
+buffer='agent bedrock configure --test-model '
+MSG: -e option--test-model-1 Bedrock model ID
