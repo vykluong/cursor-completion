@@ -1,10 +1,10 @@
 #compdef agent cursor-agent
 
 # ZSH completion script for the Cursor CLI (agent / cursor-agent)
-# Target: Cursor CLI 2026.10.01-e373342
+# Target: Cursor CLI 2026.10.16-e3cb207
 # Command/option tables written from the generated snapshot
 # tools/cli-surface.txt (mined from the bundle and probed against the
-# installed CLI), captured 2026-10-04. Descriptions are the CLI's own.
+# installed CLI), captured 2026-10-16. Descriptions are the CLI's own.
 #
 # Policy: fully static. The script never runs the CLI, reads no local state
 # (no .cursor/mcp.json, chat stores, or config), uses no command substitution
@@ -298,7 +298,7 @@ _cursor_agent_commands() {
   gated_commands=(
     'automations:Validate and deploy declarative automation YAML files'
     'cloud:Manage cloud agents (list, get, transcript)'
-    'env:Manage cloud-agent environments (list, get, deploy, publish, delete)'
+    'env:Manage cloud-agent environments (list, get, deploy, delete)'
   )
   _cursor_agent_describe_groups \
     commands 'agent commands' commands \
@@ -643,6 +643,7 @@ _cursor_agent_worker() {
     '(--labels-file)*--label[Add a label to the worker (format: key=value, can be used multiple times)]:key=value:'
     '(--label)--labels-file[Path to a JSON or TOML file containing labels (can also use CURSOR_WORKER_LABELS_FILE env var)]:labels file:_files'
     '--management-addr[Listen address for an optional HTTP server with health, readiness, and metrics endpoints]:address (for example :8080):'
+    '*--mcp-tool-timeout[How long a tool call to a stdio MCP server this worker runs may take, in seconds (repeatable)]:server[/tool]=seconds:'
     '--mint-github-token[Receive short-lived GitHub tokens during claimed runs (pool workers only)]'
     '--name[Custom display name for this worker (can also use CURSOR_WORKER_NAME env var)]:worker name:'
     '--on-session-end[Add a worker-host sessionEnd command before pool claim teardown]:command:'
@@ -719,16 +720,17 @@ _cursor_agent_worker_commands() {
 }
 
 # Exclusion groups mirror the .conflicts() calls: --pool and --warm-idle
-# conflict with --all-pools, and --session-token with --warm-idle. --pool is
-# repeatable (one pending-requests list per name).
+# conflict with --all-pools, and --identity-audience and --session-token
+# with --warm-idle. --pool is repeatable (one pending-requests list per name).
 _cursor_agent_worker_controller() {
   _arguments \
     '(--pool --warm-idle)--all-pools[Omit the pool query param so pending-requests is team-wide (not allowed in warm mode)]' \
+    '(--warm-idle)--identity-audience[Claim mode only: ask each claim for a signed identity token bound to <aud> and pass it to the spawn hook]:audience:' \
     '(--all-pools)*--pool[Pool to claim from, or in warm mode to keep warm (repeatable)]:pool name:' \
     '--repository[Filter pending requests by repository URL]:repository URL:' \
     '(--warm-idle)--session-token[Claim mode only: give the spawn hook a per-claim session token instead of CURSOR_API_KEY]' \
     '--spawn[Spawn hook to exec after a successful claim or once per missing warm worker (required)]:spawn hook:_files' \
-    '(--all-pools --session-token)--warm-idle[Warm-pool mode: keep this many idle workers connected in each --pool]:count:' \
+    '(--all-pools --identity-audience --session-token)--warm-idle[Warm-pool mode: keep this many idle workers connected in each --pool]:count:' \
     '(-h --help)'{-h,--help}'[Display help for command]'
 }
 
@@ -1423,11 +1425,10 @@ _cursor_agent_env() {
   case $state in
     args)
       case $words[1] in
-        delete)  _cursor_agent_env_delete ;;
-        deploy)  _cursor_agent_env_deploy ;;
-        get)     _cursor_agent_env_get ;;
-        list)    _cursor_agent_env_list ;;
-        publish) _cursor_agent_env_publish ;;
+        delete) _cursor_agent_env_delete ;;
+        deploy) _cursor_agent_env_deploy ;;
+        get)    _cursor_agent_env_get ;;
+        list)   _cursor_agent_env_list ;;
       esac
       ;;
   esac
@@ -1436,11 +1437,10 @@ _cursor_agent_env() {
 _cursor_agent_env_commands() {
   local -a env_commands
   env_commands=(
-    'delete:Delete an environment by id'
+    'delete:Delete an environment by its public id'
     "deploy:Save an environment.json file to the user's personal environment for a repo"
-    'get:Fetch the environment.json for a repo'
+    'get:Show your personal environments for a repo, with their environment.json'
     'list:List cloud-agent environments'
-    'publish:Publish an environment to GitHub via a PR that writes .cursor/environment.json'
   )
   _describe -t gated-commands 'env commands' env_commands
 }
@@ -1448,31 +1448,42 @@ _cursor_agent_env_commands() {
 _cursor_agent_env_delete() {
   _arguments \
     '--dry-run[Print the delete request without executing]' \
-    '--team[Treat the id as a team environment id]' \
+    '--team[The environment is a team environment]' \
     '--yes[Skip confirmation (required unless --dry-run)]' \
     '(-h --help)'{-h,--help}'[Display help for command]' \
-    '1:environment ID:'
+    '1:environment public ID:'
 }
 
 _cursor_agent_env_deploy() {
-  _arguments \
-    '--delete-personal-on-team-write[When saving to --team, also delete the personal environment for this repo]' \
-    '--git-enterprise-uuid[Git enterprise UUID for GHE / GitLab self-hosted]:uuid:' \
-    '--name[Display name for the environment]:name:' \
-    '--repo[Repository URL this environment applies to]:repository URL:' \
-    '--scm-repo-node-id[GitHub node_id or GitLab project id for this repo (required with --team)]:SCM repo node ID:' \
-    '--team[Save as a team environment instead of personal (requires --scm-repo-node-id)]' \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
+  local -a deploy_options=(
+    '--git-enterprise-uuid[Git enterprise UUID for GHE / GitLab self-hosted]:uuid:'
+    '--name[Display name for the environment]:name:'
+    '--repo[Repository URL this environment applies to]:repository URL:'
+    '--scm-repo-node-id[GitHub node_id or GitLab project id for this repo (required with --team)]:SCM repo node ID:'
+    '--team[Save as a team environment instead of personal (requires --scm-repo-node-id)]'
+    '(-h --help)'{-h,--help}'[Display help for command]'
     '1:environment.json file:_files'
+
+    # Hidden: absent from "agent env deploy --help". Registered as
+    # new Option(...).hideHelp() in ./src/cli.ts; known from static mining
+    # only, because the gated tree is not registered in the drift tool's runs.
+    '--delete-personal-on-team-write[When saving to --team, also delete the personal environment for this repo]'
+  )
+  _arguments $deploy_options
 }
 
 _cursor_agent_env_get() {
-  _arguments \
-    '--format[Output format]:format:(text json)' \
-    "--personal-only[Only fetch the user's personal environment.json override]" \
-    "--ref[Git ref to read the repo's .cursor/environment.json from (defaults to HEAD)]:git ref:" \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
+  local -a get_options=(
+    '--format[Output format]:format:(text json)'
+    '(-h --help)'{-h,--help}'[Display help for command]'
     '1:repository URL:'
+
+    # Hidden: absent from "agent env get --help". Registered as
+    # new Option(...).hideHelp() in ./src/cli.ts; known from static mining
+    # only, because the gated tree is not registered in the drift tool's runs.
+    '--personal-only[Accepted for older scripts; the output is the same]'
+  )
+  _arguments $get_options
 }
 
 _cursor_agent_env_list() {
@@ -1481,14 +1492,6 @@ _cursor_agent_env_list() {
     '(-n --limit)'{-n,--limit}'[Maximum number of environments]:number:' \
     '--scope[Filter by environment scope]:scope:(personal team all)' \
     '(-h --help)'{-h,--help}'[Display help for command]'
-}
-
-_cursor_agent_env_publish() {
-  _arguments \
-    '--format[Output format]:format:(text json)' \
-    '--team[Treat the id as a team environment id]' \
-    '(-h --help)'{-h,--help}'[Display help for command]' \
-    '1:environment ID:'
 }
 
 # ===========================================================================

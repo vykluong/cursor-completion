@@ -3,4 +3,3 @@ delete
 deploy
 get
 list
-publish

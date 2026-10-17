@@ -1,0 +1,8 @@
+buffer='agent worker controller --identity-audience x -'
+--all-pools
+--help
+--pool
+--repository
+--session-token
+--spawn
+-h

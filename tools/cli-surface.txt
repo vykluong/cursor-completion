@@ -18,10 +18,9 @@ arg | agent cloud transcript | <id> | gated:cli_factory | pos=1 | required | sta
 arg | agent dev classify-conversation | <id> | dev-only | pos=1 | required | static-only="dev-only: compiled out"
 arg | agent dev help | [command] | dev-only | pos=1 | optional | static-only="dev-only: compiled out"
 arg | agent dev score-commit | [hash] | dev-only | pos=1 | optional | static-only="dev-only: compiled out"
-arg | agent env delete | <id> | gated:cli_factory | pos=1 | required | static-only="gated: not registered in isolation"
+arg | agent env delete | <publicId> | gated:cli_factory | pos=1 | required | static-only="gated: not registered in isolation"
 arg | agent env deploy | <file> | gated:cli_factory | pos=1 | required | static-only="gated: not registered in isolation"
 arg | agent env get | <repoUrl> | gated:cli_factory | pos=1 | required | static-only="gated: not registered in isolation"
-arg | agent env publish | <id> | gated:cli_factory | pos=1 | required | static-only="gated: not registered in isolation"
 arg | agent gpt-5 | [prompt...] | hidden | pos=1 | optional variadic | help-listed
 arg | agent gpt5 | [prompt...] | hidden | pos=1 | optional variadic | help-listed
 arg | agent help | [command] | visible | pos=1 | optional | help-listed
@@ -83,7 +82,6 @@ cmd | agent env | delete | gated:cli_factory | action | static-only="gated: not 
 cmd | agent env | deploy | gated:cli_factory | action | static-only="gated: not registered in isolation" | not-walked="gated: not registered in isolation"
 cmd | agent env | get | gated:cli_factory | action | static-only="gated: not registered in isolation" | not-walked="gated: not registered in isolation"
 cmd | agent env | list | gated:cli_factory | action | static-only="gated: not registered in isolation" | not-walked="gated: not registered in isolation"
-cmd | agent env | publish | gated:cli_factory | action | static-only="gated: not registered in isolation" | not-walked="gated: not registered in isolation"
 cmd | agent local-worker | help | hidden | builtin | subcommands | action | help-listed | not-walked="builtin: prints the parent's help"
 cmd | agent local-worker | kill | hidden | action | help-listed | walk=own-usage
 cmd | agent local-worker | ping | hidden | action | help-listed | walk=own-usage
@@ -177,9 +175,9 @@ grammar | agent persist | usage | visible | agent persist stop <session> | help-
 grammar | agent worker | pool-bare-value | visible | default | static-only="argv rewrite before commander"
 grammar | agent worker | pool-rewrite-flags | visible | --all-pools,--pool,--pool-name,--pool= | static-only="argv rewrite before commander"
 grammar | agent worker | pool-stop-words | visible | start,controller,debug,help | static-only="argv rewrite before commander"
-meta | agent | bundle-version | static | 2026.10.01-e373342
+meta | agent | bundle-version | static | 2026.10.16-e3cb207
 meta | agent | module | static | ./src/cli.ts in index.js
-meta | agent | version | static | 2026.10.01-e373342
+meta | agent | version | static | 2026.10.16-e3cb207
 opt | agent about | --format <format> | visible | value=required | choices=text,json | default=text | help-listed
 opt | agent about | -h, --help | visible | value=none | builtin | help-listed
 opt | agent acp | -h, --help | hidden | value=none | builtin | help-listed
@@ -260,7 +258,7 @@ opt | agent env delete | --dry-run | gated:cli_factory | value=none | static-onl
 opt | agent env delete | --team | gated:cli_factory | value=none | static-only="gated: not registered in isolation"
 opt | agent env delete | --yes | gated:cli_factory | value=none | static-only="gated: not registered in isolation"
 opt | agent env delete | -h, --help | gated:cli_factory | value=none | builtin | static-only="gated: not registered in isolation"
-opt | agent env deploy | --delete-personal-on-team-write | gated:cli_factory | value=none | static-only="gated: not registered in isolation"
+opt | agent env deploy | --delete-personal-on-team-write | gated:cli_factory | hidden | value=none | static-only="gated: not registered in isolation"
 opt | agent env deploy | --git-enterprise-uuid <uuid> | gated:cli_factory | value=required | static-only="gated: not registered in isolation"
 opt | agent env deploy | --name <name> | gated:cli_factory | value=required | static-only="gated: not registered in isolation"
 opt | agent env deploy | --repo <url> | gated:cli_factory | value=required | mandatory | static-only="gated: not registered in isolation"
@@ -268,16 +266,12 @@ opt | agent env deploy | --scm-repo-node-id <id> | gated:cli_factory | value=req
 opt | agent env deploy | --team | gated:cli_factory | value=none | static-only="gated: not registered in isolation"
 opt | agent env deploy | -h, --help | gated:cli_factory | value=none | builtin | static-only="gated: not registered in isolation"
 opt | agent env get | --format <format> | gated:cli_factory | value=required | choices=text,json | default=json | static-only="gated: not registered in isolation"
-opt | agent env get | --personal-only | gated:cli_factory | value=none | static-only="gated: not registered in isolation"
-opt | agent env get | --ref <ref> | gated:cli_factory | value=required | static-only="gated: not registered in isolation"
+opt | agent env get | --personal-only | gated:cli_factory | hidden | value=none | static-only="gated: not registered in isolation"
 opt | agent env get | -h, --help | gated:cli_factory | value=none | builtin | static-only="gated: not registered in isolation"
 opt | agent env list | --format <format> | gated:cli_factory | value=required | choices=text,json | default=json | static-only="gated: not registered in isolation"
 opt | agent env list | --scope <scope> | gated:cli_factory | value=required | choices=personal,team,all | default=all | static-only="gated: not registered in isolation"
 opt | agent env list | -h, --help | gated:cli_factory | value=none | builtin | static-only="gated: not registered in isolation"
 opt | agent env list | -n, --limit <number> | gated:cli_factory | value=required | static-only="gated: not registered in isolation"
-opt | agent env publish | --format <format> | gated:cli_factory | value=required | choices=text,json | default=json | static-only="gated: not registered in isolation"
-opt | agent env publish | --team | gated:cli_factory | value=none | static-only="gated: not registered in isolation"
-opt | agent env publish | -h, --help | gated:cli_factory | value=none | builtin | static-only="gated: not registered in isolation"
 opt | agent env | -h, --help | gated:cli_factory | value=none | builtin | static-only="gated: not registered in isolation"
 opt | agent generate-rule | -h, --help | visible | value=none | builtin | help-listed
 opt | agent get-channel | -h, --help | hidden | value=none | builtin | help-listed
@@ -344,6 +338,7 @@ opt | agent uninstall-shell-integration | -h, --help | visible | value=none | bu
 opt | agent update | -h, --help | visible | value=none | builtin | help-listed
 opt | agent upgrade | -h, --help | hidden | value=none | builtin | help-listed
 opt | agent worker controller | --all-pools | visible | value=none | help-listed
+opt | agent worker controller | --identity-audience <aud> | visible | value=required | parser | conflicts=--warm-idle | help-listed
 opt | agent worker controller | --pool <name> | visible | value=required | parser | conflicts=--all-pools | help-listed
 opt | agent worker controller | --repository <url> | visible | value=required | help-listed
 opt | agent worker controller | --session-token | visible | value=none | conflicts=--warm-idle | help-listed
@@ -367,6 +362,7 @@ opt | agent worker | --idle-release-timeout <seconds> | visible | value=required
 opt | agent worker | --label <key=value> | visible | value=required | parser | help-listed
 opt | agent worker | --labels-file <path> | visible | value=required | env=CURSOR_WORKER_LABELS_FILE | help-listed
 opt | agent worker | --management-addr <address> | visible | value=required | help-listed
+opt | agent worker | --mcp-tool-timeout <server[/tool]=seconds> | visible | value=required | parser | help-listed
 opt | agent worker | --mint-github-token | visible | value=none | default=false | help-listed
 opt | agent worker | --name <name> | visible | value=required | env=CURSOR_WORKER_NAME | help-listed
 opt | agent worker | --on-session-end <command> | visible | value=required | help-listed

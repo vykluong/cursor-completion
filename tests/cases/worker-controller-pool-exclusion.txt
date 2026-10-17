@@ -1,5 +1,6 @@
 buffer='agent worker controller --pool gpu -'
 --help
+--identity-audience
 --pool
 --repository
 --session-token

@@ -1,0 +1,2 @@
+buffer='agent worker --mcp-tool-timeout '
+MSG: -e option--mcp-tool-timeout-1 server[/tool]=seconds

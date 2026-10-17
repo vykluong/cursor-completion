@@ -12,6 +12,7 @@ buffer='agent worker -'
 --label
 --labels-file
 --management-addr
+--mcp-tool-timeout
 --mint-github-token
 --name
 --on-session-end

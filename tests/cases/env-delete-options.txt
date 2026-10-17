@@ -4,4 +4,4 @@ buffer='agent env delete -'
 --team
 --yes
 -h
-MSG: -e argument-1 environment ID
+MSG: -e argument-1 environment public ID

@@ -1,2 +1,2 @@
 buffer='agent env delete '
-MSG: -e argument-1 environment ID
+MSG: -e argument-1 environment public ID

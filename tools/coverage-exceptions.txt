@@ -33,6 +33,7 @@ _cursor_agent_persist_list | opt-missing | --help | hand-rolled parser: `persist
 _cursor_agent_persist_stop | opt-missing | --help | hand-rolled parser: `persist stop --help` takes --help as the session name
 
 _cursor_agent_worker | opt-repeat | --label | repeatable per its own description ("can be used multiple times"); the miner does not tag it repeatable
+_cursor_agent_worker | opt-repeat | --mcp-tool-timeout | repeatable per its own description ("(repeatable)"); the miner does not tag it repeatable
 _cursor_agent_worker_controller | opt-repeat | --pool | repeatable per its own description ("(repeatable)"); the miner does not tag it repeatable
 
 # Model shortcuts: hidden commands that start a session with a fixed model.

@@ -1,6 +1,7 @@
 buffer='agent worker controller --session-token -'
 --all-pools
 --help
+--identity-audience
 --pool
 --repository
 --spawn
