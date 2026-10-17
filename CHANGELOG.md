@@ -18,6 +18,33 @@ To preview an update before switching, run
 7. Bump the target-version header in `src/_cursor-agent`.
 8. Add a CHANGELOG section and tag `cli-<version>`.
 
+## [cli-2026.10.16-e3cb207] - 2026-10-16
+
+Verified against Cursor CLI 2026.10.16-e3cb207.
+
+### Added
+
+- `worker --mcp-tool-timeout <server[/tool]=seconds>` (repeatable).
+- `worker controller --identity-audience <aud>`, which excludes
+  `--warm-idle`.
+
+### Removed
+
+- Gated `env publish` and `env get --ref`.
+
+### Changed
+
+- `env get --personal-only` and `env deploy --delete-personal-on-team-write`
+  are now hidden.
+- The `env delete` positional is `<publicId>`, and the descriptions for
+  `env`, `env get`, `env delete`, and `env delete --team` follow the CLI.
+
+### Verification
+
+- A full drift run (70 help screens, 47 option probes) exited 0 against the
+  new build with no leaked processes.
+- A static diff between the two bundles agrees with the executed view.
+
 ## [cli-2026.10.01-e373342] - 2026-10-04
 
 Verified against Cursor CLI 2026.10.01-e373342. First release.
@@ -56,4 +83,5 @@ Verified against Cursor CLI 2026.10.01-e373342. First release.
 - GitHub Actions CI (`.github/workflows/ci.yml`): `zsh -n` on the script and
   all tooling, then the test suite on Ubuntu and macOS.
 
+[cli-2026.10.16-e3cb207]: https://github.com/vykluong/cursor-completion/releases/tag/cli-2026.10.16-e3cb207
 [cli-2026.10.01-e373342]: https://github.com/vykluong/cursor-completion/releases/tag/cli-2026.10.01-e373342

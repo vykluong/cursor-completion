@@ -4,7 +4,7 @@
 
 A static Zsh completion script for the [Cursor CLI](https://cursor.com/docs/cli), covering both of its command names, `agent` and `cursor-agent`.
 
-Generated against Cursor CLI 2026.10.01-e373342.
+Generated against Cursor CLI 2026.10.16-e3cb207.
 
 ## What it completes
 

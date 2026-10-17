@@ -1,6 +1,6 @@
 # Plan: Zsh completion for the Cursor CLI (`agent`)
 
-> **Handoff pointer (2026-10-04):** Steps 1 to 5 are merged to `main`, and the full `zsh tests/run-tests.zsh` suite passes (325 cases). The first release is tagged and pushed as `cli-2026.10.01-e373342`. Verification items 2, 5 and 7 remain because they execute the CLI or need a person. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed.
+> **Handoff pointer (2026-10-16):** Steps 1 to 5 are merged to `main`. The first release was tagged as `cli-2026.10.01-e373342`. The 2026.10.16-e3cb207 update on 2026-10-16 completed verification items 2 (full drift run) and 7 (update rehearsal), so only item 5 remains because it needs a person. The next session starts from tag `cli-2026.10.16-e3cb207`. Never run `agent`; use `CHECK_DRIFT_CACHE=<dir>` if the drift tool is needed.
 
 
 ## Context

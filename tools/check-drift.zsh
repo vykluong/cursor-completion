@@ -28,10 +28,11 @@
 #                         help-walk and probe attributes.
 #   --full                diff: dump both versions in full, which EXECUTES both
 #                         CLIs (over 100 runs each). The runner's argv shapes
-#                         were cleared as safe against 2026.10.01-e373342 only;
-#                         another build may act on a probe line (start a
-#                         session or a worker). Default: static, nothing runs,
-#                         and the report is not probe-verified.
+#                         were cleared as safe against 2026.10.01-e373342 and
+#                         2026.10.16-e3cb207 only; another build may act on a
+#                         probe line (start a session or a worker). Default:
+#                         static, nothing runs, and the report is not
+#                         probe-verified.
 #
 # Environment:
 #   CHECK_DRIFT_CACHE=<dir>  development aid: record every CLI run under

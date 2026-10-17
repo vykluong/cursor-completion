@@ -2,7 +2,7 @@
 
 ## What this is
 
-A single Zsh completion script, `src/_cursor-agent` (`#compdef agent cursor-agent`), for the Cursor CLI. There is no build step and no package manager. Everything is plain zsh. Target CLI: 2026.10.01-e373342.
+A single Zsh completion script, `src/_cursor-agent` (`#compdef agent cursor-agent`), for the Cursor CLI. There is no build step and no package manager. Everything is plain zsh. Target CLI: 2026.10.16-e3cb207.
 
 ## Commands
 
@@ -64,7 +64,7 @@ Only `tools/check-drift.zsh` may run `agent`, and CI never does.
 - `agent persist attach --help` and `agent persist stop --help` treat `--help` as a session name. Never run them.
 - Run each invocation in a fresh throwaway directory (`HOME`, `CURSOR_CONFIG_DIR`, `TMPDIR`, and a cwd outside any git repo) with an environment built from scratch (no `CURSOR_*`; `AGENT_CLI_CREDENTIAL_STORE=memory` keeps it off the login keychain), `</dev/null`, and a wall-clock cap that kills its process group.
 - Only two argv shapes ever run: `<command words> --help` and the option probe `<command words> <flag> --zz-bogus-1 --zz-bogus-2`. One trailing bogus flag is not enough: a required value or a shadowing root option can eat it, and the line then parses cleanly (`worker start --data-dir --zz-bogus` starts a worker). `run_isolated` and `guard_argv` enforce this; never loosen them.
-- The safety analysis covered build 2026.10.01-e373342 only, so `check-drift.zsh diff` is static unless given `--full`, which executes both versions.
+- The safety analysis covered builds 2026.10.01-e373342 and 2026.10.16-e3cb207 only, so `check-drift.zsh diff` is static unless given `--full`, which executes both versions.
 
 ## Updating for a new CLI release
 
@@ -81,5 +81,5 @@ To preview an update before switching, run `zsh tools/check-drift.zsh diff <old-
 
 ## Style
 
-- Commit subjects are imperative and capitalized, no conventional-commit prefix (`Add ...`, `Fix ...`, `Update _cursor-agent for CLI 2026.10.01-e373342`).
+- Commit subjects are imperative and capitalized, no conventional-commit prefix (`Add ...`, `Fix ...`, `Update _cursor-agent for CLI 2026.10.16-e3cb207`).
 - Prose uses American English and avoids em dashes.
