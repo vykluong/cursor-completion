@@ -6,10 +6,10 @@
 # snapshot.
 #
 # MAINTAINERS: run this after `zsh tools/check-drift.zsh snapshot` (runbook in
-# CLAUDE.md). Snapshot drift says what changed in the CLI; this tool says what
-# the script still lacks. It never runs `agent` and never sources or executes
-# the script: both files are parsed as text, so it needs no binary and runs in
-# CI and in the test preflight.
+# CONTRIBUTING.md). Snapshot drift says what changed in the CLI; this tool
+# says what the script still lacks. It never runs `agent` and never sources or
+# executes the script: both files are parsed as text, so it needs no binary and
+# runs in CI and in the test preflight.
 #
 # Usage:
 #   zsh tools/check-coverage.zsh [options]

@@ -3,20 +3,7 @@
 All notable changes to the `_cursor-agent` zsh completion script are documented
 in this file, one section per `cli-<version>` tag.
 
-## Release process
-
-To preview an update before switching, run
-`zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>`.
-
-1. `agent update`.
-2. `zsh tools/check-drift.zsh`. If it exits 2 ("miner needs attention"), fix
-   the miner first.
-3. `zsh tools/check-drift.zsh snapshot`.
-4. `zsh tools/check-coverage.zsh` and edit the functions it lists.
-5. Regenerate affected test cases with `zsh tests/zcomp-runner.zsh '<buffer>'`.
-6. `zsh tests/run-tests.zsh`.
-7. Bump the target-version header in `src/_cursor-agent`.
-8. Add a CHANGELOG section and tag `cli-<version>`.
+The release checklist is in CONTRIBUTING.md.
 
 ## [cli-2026.10.16-e3cb207] - 2026-10-16
 

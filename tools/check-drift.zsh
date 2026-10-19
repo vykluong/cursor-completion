@@ -5,7 +5,7 @@
 # written against, recorded in tools/cli-surface.txt.
 #
 # MAINTAINERS: rerun `zsh tools/check-drift.zsh` after every `agent update`
-# (full runbook in CLAUDE.md). Exit 2 with "miner needs attention" means the
+# (runbook in CONTRIBUTING.md). Exit 2 with "miner needs attention" means the
 # bundle changed shape under the miner: fix the miner before trusting any
 # result, never the other way around.
 #
@@ -120,7 +120,7 @@
 #   walk=own-usage|fallback | not-walked=<why>   on cmd records
 #
 # Every execution of `agent` goes through run_isolated (see the hazards in
-# CLAUDE.md).
+# CONTRIBUTING.md).
 
 emulate -L zsh
 setopt extended_glob no_unset pipe_fail
@@ -1199,8 +1199,8 @@ mine_static() {
 # Execution half: running the CLI
 # ---------------------------------------------------------------------------
 #
-# The rules below come from a safety analysis of this CLI (the hazards in
-# CLAUDE.md are the short form):
+# The rules below come from a safety analysis of this CLI (CONTRIBUTING.md
+# has the short form):
 #   - Only two argv shapes are ever run: `<words> --help` on a registered
 #     command path, and the option probe `<words> <flag> --zz-bogus-1
 #     --zz-bogus-2`. A required value eats --zz-bogus-1 and the root parser
@@ -2039,7 +2039,7 @@ mode_check() {
   print -r -- ""
   print -r -- "check-drift: DRIFT. Edit the functions named above in src/_cursor-agent, regenerate"
   print -r -- "  their test cases, re-snapshot (zsh tools/check-drift.zsh snapshot) and bump the"
-  print -r -- "  target-version header. Runbook: CLAUDE.md, \"Updating for a new CLI release\"."
+  print -r -- "  target-version header. Runbook: CONTRIBUTING.md, \"Release process\"."
   return 1
 }
 
