@@ -2,25 +2,22 @@
 
 ## What this is
 
-A single Zsh completion script, `src/_cursor-agent` (`#compdef agent cursor-agent`), for the Cursor CLI. There is no build step and no package manager. Everything is plain zsh. Target CLI: 2026.10.16-e3cb207.
+A single Zsh completion script, `src/_cursor-agent` (`#compdef agent cursor-agent`), for the Cursor CLI. There is no build step and no package manager. Everything is plain zsh.
 
 ## Commands
 
 ```bash
-zsh tests/run-tests.zsh              # full golden-file suite (CI runs this on ubuntu + macos)
+zsh tests/run-tests.zsh              # golden-file suite; preflights `zsh -n` and check-coverage
 zsh tests/run-tests.zsh 'mcp-*'      # subset, glob on case name
 zsh tests/zcomp-runner.zsh 'agent mcp '   # print candidates for one buffer
 DOUBLE_TAB=1 zsh tests/zcomp-runner.zsh 'agent '   # simulate a second TAB
-zsh -n src/_cursor-agent             # syntax check (CI gate; the suite also runs it as preflight)
-zsh tools/check-coverage.zsh         # compare src/_cursor-agent with the snapshot, both directions (no binary needed; the suite also runs it as preflight)
-zsh tools/check-drift.zsh            # diff installed CLI against tools/cli-surface.txt (runs `agent`; exit 1 drift, 2 tool or miner failure)
+zsh tools/check-coverage.zsh         # script vs. snapshot, both directions; executes nothing
+zsh tools/check-drift.zsh            # installed CLI vs. tools/cli-surface.txt; RUNS `agent` (exit 1 drift, 2 tool or miner failure)
 zsh tools/check-drift.zsh snapshot   # accept the new CLI surface
-zsh tools/check-drift.zsh dump --static   # mined records only; executes nothing
-zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>   # compare two installed versions, statically
-zsh tools/check-drift.zsh --help     # modes, flags (--version-dir, --static, --full), exit codes
+zsh tools/check-drift.zsh --help     # other modes (dump, diff) and flags (--static, --full, --version-dir)
 ```
 
-The test harness drives a real interactive zsh through zpty. It never invokes the `agent` binary; only `tools/check-drift.zsh` does.
+The test harness drives a real interactive zsh through zpty and never invokes `agent`.
 
 ## Scope: the four surface tiers
 
@@ -33,18 +30,18 @@ The test harness drives a real interactive zsh through zpty. It never invokes th
 
 - Fully static: the script never runs `agent`, never reads `.cursor/mcp.json`, chat stores, or any other local state, uses no `eval`, and forks no subprocesses. Runtime-only values (models, teams, MCP identifiers, chat IDs, workspaces, persist sessions, marketplaces) get a descriptive message and no candidates. Secret-bearing options (`--api-key`, `--auth-token`, `--local-agent-api-key`, `bedrock configure --access-key/--secret-key`) complete nothing.
 - Every command and flag the binary accepts in tiers 1 to 3 is completed, including ones `--help` hides, except the deliberate deviations in `tools/coverage-exceptions.txt`. The hidden model shortcuts (`gpt-5`, `gpt5`, `opus`, `sonnet`) are left out because `agent --model <model>` replaces them. A hidden or gated entry carries a comment stating its class (hidden or gated) and how that class is verified. Per-entry probe results, dates, and versions live in the generated snapshot `tools/cli-surface.txt`, not in script comments.
-- Keep the target-version header comment in sync with the CLI version the tables were generated against. It is the only place the version appears.
+- Keep the target-version header comment in sync with the CLI version the tables were generated against. It is the script's only copy of the version.
 - Leaf contexts complete leaf options only. Commander also accepts root options after a subcommand, but that is deliberate noise reduction. Before a subcommand, and after a first word that is not a command (the prompt case), root options stay available.
 - Values complete in the space-separated form only (`--mode plan`). Do not declare the `--opt=value` form; the CLI's own hints do not use it.
 - No commands after an optional-value option: commander takes the next word as the value, so after `--resume` or `-w/--worktree` only the value message is offered, and after a bare worker `--pool` only the `--pool` stop words.
 - Naming: helpers are `_cursor_agent_*`. Per-command function names derive mechanically from the command path (`agent plugin marketplace add` is `_cursor_agent_plugin_marketplace_add`).
 - Write `{--a,--b}` brace pairs inline inside the `_arguments` array. Never store a brace spec in a scalar; it will not expand.
 - Every behavior change needs a matching case in `tests/cases/`. Regenerate expectations with `zsh tests/zcomp-runner.zsh '<buffer>'` and review them against `tools/cli-surface.txt`; do not hand-type them.
-- The number of tokens used to edit files is best minimized, all else being equal. Therefore, when it will not affect the end result, try to surgically edit a file rather than rewrite the entire thing.
+- Prefer surgical edits over rewriting a whole file when the result is the same; it saves tokens.
 
 ## Test case files (tests/cases/*.txt)
 
-- Format is documented at the top of `tests/run-tests.zsh` (`buffer=` line, optional `# mode:` and `# double-tab` lines, set comparison). Modes are `exact` (default), `contains`, and `empty`. An `empty` case lists no expected lines and passes only if the harness's run marker shows `_cursor-agent` ran cleanly (runner exit 0, not 3), so a load error cannot pass as "offers nothing".
+- The format and modes (`exact`, `contains`, `empty`) are documented at the top of `tests/run-tests.zsh`. An `empty` case also requires the runner's clean-run marker (exit 0, not 3), so a load error cannot pass as "offers nothing".
 
 ## Editing the zsh tooling (tests/, tools/)
 
@@ -68,16 +65,7 @@ Only `tools/check-drift.zsh` may run `agent`, and CI never does.
 
 ## Updating for a new CLI release
 
-To preview an update before switching, run `zsh tools/check-drift.zsh diff <old-version-dir> <new-version-dir>`.
-
-1. `agent update`.
-2. `zsh tools/check-drift.zsh`. If it exits 2 ("miner needs attention"), fix the miner first.
-3. `zsh tools/check-drift.zsh snapshot`.
-4. `zsh tools/check-coverage.zsh` and edit the functions it lists.
-5. Regenerate affected test cases with `zsh tests/zcomp-runner.zsh '<buffer>'`.
-6. `zsh tests/run-tests.zsh`.
-7. Bump the target-version header in `src/_cursor-agent`.
-8. Add a CHANGELOG section and tag `cli-<version>`.
+Follow the checklist under "Release process" in `CHANGELOG.md`.
 
 ## Style
 
