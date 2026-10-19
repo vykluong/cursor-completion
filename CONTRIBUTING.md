@@ -8,7 +8,7 @@
 
 1. **Visible in `--help`**: completed.
 2. **Hidden but registered** (commands and options the CLI accepts but `--help` does not list, such as `shell-integration` or `--repo-endpoint`): completed.
-3. **Feature-gated** (account-dependent: `automations`, `cloud`, `env`): completed, in their own labelled block and `gated-commands` tag, removable in one edit. These are known from static mining of the CLI bundle only, so they may not be available on every account.
+3. **Feature-gated** (account-dependent: `automations`, `cloud`, `env`): completed, in their own labeled block and `gated-commands` tag, removable in one edit. These are known from static mining of the CLI bundle only, so they may not be available on every account.
 4. **Dev-only** (compiled out of release builds, such as `dev`, `dev-login`, `--ian-dev`): excluded, since the binary cannot execute them.
 
 `cursor`, the Cursor IDE's shell command, is deliberately not claimed.
@@ -22,6 +22,7 @@
 - **Space-separated values only.** Values complete as `--mode plan`, not `--mode=plan`, matching the CLI's own usage hints. Do not declare the `--opt=value` form.
 - **No commands after an optional-value option.** After `--resume`, `-w`/`--worktree`, or a bare worker `--pool`, the CLI takes the next word as the value, so no commands are offered there (except the words that end a worker `--pool`).
 - **No model shortcuts.** The hidden model shortcuts (`gpt-5`, `gpt5`, `opus`, `sonnet`) are left out because `agent --model <model>` replaces them.
+- **Mechanical function names.** Helpers are `_cursor_agent_*`, and per-command function names derive mechanically from the command path (`agent plugin marketplace add` is `_cursor_agent_plugin_marketplace_add`). `tools/check-coverage.zsh` enforces this.
 
 Every command and flag in tiers 1 to 3 is completed, except the deliberate deviations in [`tools/coverage-exceptions.txt`](tools/coverage-exceptions.txt). A hidden or gated entry carries a comment stating its class (hidden or gated) and how that class is verified. Per-entry probe results, dates, and versions live in the snapshot, not in script comments.
 
@@ -45,7 +46,7 @@ The harness drives a real interactive zsh through `zpty` and never invokes the `
 
 ## Executing the CLI (hazards)
 
-Only `tools/check-drift.zsh` may run `agent`, and CI never does. The long form is the comment blocks above `guard_argv` and `run_isolated` in `tools/check-drift.zsh`.
+Only `tools/check-drift.zsh` may run `agent`, and CI never does. The long form is the "Execution half: running the CLI" comment block in `tools/check-drift.zsh`; `guard_argv` and `run_isolated` enforce it.
 
 - Every invocation, even `--help`, does a DNS lookup of `api2.cursor.sh` and may warm Statsig.
 - An unknown first word is a prompt and starts a real session. Never run a line that could parse cleanly (no bare booleans, no positional words).

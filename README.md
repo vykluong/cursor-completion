@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/vykluong/cursor-completion/actions/workflows/ci.yml/badge.svg)](https://github.com/vykluong/cursor-completion/actions/workflows/ci.yml)
 
-A [static](CONTRIBUTING.md#design-policy) Zsh completion script for the [Cursor CLI](https://cursor.com/docs/cli), covering both of its command names, `agent` and `cursor-agent`. It completes every visible and hidden command and option, plus the [feature-gated](CONTRIBUTING.md#scope-the-four-surface-tiers) `automations`, `cloud`, and `env` trees.
+A [static](CONTRIBUTING.md#design-policy) Zsh completion script for the [Cursor CLI](https://cursor.com/docs/cli), covering both of its command names, `agent` and `cursor-agent`. It completes every visible and hidden command and option, with a few [deliberate exceptions](CONTRIBUTING.md#design-policy), plus the [feature-gated](CONTRIBUTING.md#scope-the-four-surface-tiers) `automations`, `cloud`, and `env` trees.
 
 Generated against Cursor CLI 2026.10.16-e3cb207.
 
@@ -20,7 +20,7 @@ fpath=(~/.zsh/completions $fpath)
 autoload -U compinit && compinit
 ```
 
-Alternatively, drop the file into a directory already on `fpath`, which needs no `.zshrc` change. On Homebrew:
+Alternatively, on Homebrew, drop the file into Homebrew's `site-functions` directory. It is already on `fpath` when you use Homebrew's zsh; with the macOS system zsh, add that directory to `fpath` before `compinit` as in the first block.
 
 ```bash
 curl -fsSL -o "$(brew --prefix)/share/zsh/site-functions/_cursor-agent" \
